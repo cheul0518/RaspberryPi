@@ -17,7 +17,7 @@
 | 전원 ON 시 동작 | OS 부팅 -> 로그인 -> 프로그램 실행 | 프로그램 실행 |
 
 ## 라즈베리 파이 5 구조
-![Raspberry Pi 5] 
+![Raspberry Pi 5](../images/raspberrypi5_anatomy.jpg)
 참고: https://www.kiwi-electronics.com/en/raspberry-pi-5-16gb-20255
 
 ## 시작하기
