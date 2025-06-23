@@ -16,6 +16,10 @@
 | 사용 예시        | 미디어 재생, 웹서버, 얼굴 인식 처리 | 전등 자동 제어, 온도 감지 후 팬 켜기 |
 | 전원 ON 시 동작 | OS 부팅 -> 로그인 -> 프로그램 실행 | 프로그램 실행 |
 
+## 라즈베리 파이 5 구조
+![Raspberry Pi 5] 
+참고: https://www.kiwi-electronics.com/en/raspberry-pi-5-16gb-20255
+
 ## 시작하기
 - [시작 가이드](./getting-started.md)
 - [사용 방법](./usage.md)
