@@ -1,3 +1,10 @@
+Welcome! Please choose your language:
+  - KR [한국어로 보기](./ko/README.md)
+  - EN [View in English](./en/README.md)
+
+
+
+
 1. Linux commands
 2. GPIO layout
 3. Board v. Broadcom
