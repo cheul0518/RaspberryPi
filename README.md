@@ -1,6 +1,6 @@
 Welcome! Please choose your language:
-  - KR [한국어로 보기](./ko/README.md)
-  - EN [View in English](./en/README.md)
+  - ko [한국어로 보기](./ko/README.md)
+  - en [View in English](./en/README.md)
 
 
 
