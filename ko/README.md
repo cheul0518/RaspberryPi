@@ -74,7 +74,12 @@
 
 <br><br><br>
 
-## 
+## 라즈베리파이 기본 설정(Raspberry Pi Configuration)
+- System: To desktop(GUI), To CLI(Command Line Interface)
+- Display: underscan(가장자리 여백처리), screen blanking(절전 모드)
+- Interfaces: SSH(Secure Shell), VNC(Virtual Network Computing) 설정
+- Performance: GPU, Overlay File, Fan 설정 등
+- Localisation: 국가 또는 글자, 시간 설정이 가능
 
 
 <br><br><br>
