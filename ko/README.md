@@ -61,7 +61,7 @@
 
 ## 라즈베리 파이 5 구조
 ![Raspberry Pi 5](../images/raspberrypi5_anatomy.jpg)
-참고: https://www.kiwi-electronics.com/en/raspberry-pi-5-16gb-20255
+출처: https://www.kiwi-electronics.com/en/raspberry-pi-5-16gb-20255
 
 <br><br><br>
 
@@ -70,7 +70,7 @@
 
 - '플래싱'이란, 운영체제 이미지 파일을 SD카드나 USB에 그냥 복사하는 게 아니라, 그 저장장치가 "운영체제 부팅이 가능한 상태"가 되도록 통째로 덮어써 주는 작업
 - '이미지'란, 운영체제가 설치된 저장장치 전체를 복사한 파일(.img 확장자)
-- 링크: [v1.8.5](https://github.com/raspberrypi/rpi-imager/releases/tag/v1.8.5)
+- 링크: [v1.8.5 다운로드](https://github.com/raspberrypi/rpi-imager/releases/tag/v1.8.5)
 
 <br><br><br>
 
