@@ -4,5 +4,5 @@ After=NetworkManager.service
 
 [Service]
 Type=oneshot
-# "핫스팟 이름"을 아이폰 핫스팟 이름(설정 → 일반 → 정보 → 이름)으로 바꾸세요
-ExecStart=/usr/local/bin/hotspot-priority.sh "핫스팟 이름"
+# 따옴표 안은 아이폰 핫스팟 이름 (설정 → 일반 → 정보 → 이름)
+ExecStart=/usr/local/bin/hotspot-priority.sh "iPhone"

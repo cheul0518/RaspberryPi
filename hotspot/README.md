@@ -54,12 +54,13 @@
 
 **① 핫스팟 저장 + 우선순위 지정** (아이폰 핫스팟을 켜 둔 상태에서)
 ```bash
-sudo nmcli dev wifi connect "핫스팟 이름" password "비밀번호"
+sudo nmcli dev wifi connect "iPhone" password "비밀번호"
 nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 저장된 Wi-Fi 이름 확인
 
-sudo nmcli connection modify "핫스팟 이름" connection.autoconnect-priority 10   # 1순위
-sudo nmcli connection modify "지금 Wi-Fi 이름" connection.autoconnect-priority 5  # 2순위
+sudo nmcli connection modify "iPhone" connection.autoconnect-priority 10   # 1순위
+sudo nmcli connection modify "iptime" connection.autoconnect-priority 5  # 2순위
 ```
+- `"iPhone"` = 아이폰 핫스팟 이름, `"iptime"` = 지금 쓰는 Wi-Fi 연결 이름 (`nmcli connection show`로 확인). 다르면 그 부분만 바꾸기
 - 우선순위 숫자가 클수록 먼저 접속 (부팅할 때 둘 다 보이면 핫스팟 선택)
 - 핫스팟이 꺼지면 NetworkManager가 자동으로 2순위 Wi-Fi에 다시 접속
 
@@ -80,8 +81,7 @@ sudo cp hotspot-priority.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/hotspot-priority.sh
 sudo cp hotspot-priority.service hotspot-priority.timer /etc/systemd/system/
 
-# 3) "핫스팟 이름"을 실제 이름으로 바꾸기 (①에서 저장한 이름과 똑같이)
-# 아래 "iPhone" 자리에 실제 핫스팟 이름 (설정 → 일반 → 정보 → 이름)
+# 3) 서비스 파일에 핫스팟 이름 넣기 (핫스팟 이름이 iPhone이 아니면 "iPhone"만 바꿔서 실행)
 sudo sed -i 's|^ExecStart=.*|ExecStart=/usr/local/bin/hotspot-priority.sh "iPhone"|' /etc/systemd/system/hotspot-priority.service
 grep ExecStart /etc/systemd/system/hotspot-priority.service   # 바뀌었는지 확인
 
