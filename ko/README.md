@@ -6,6 +6,7 @@
 - [소개](#라즈베리-파이란?)
 - [비교](#아두이노와-비교)
 - [라즈베리 파이 5 구조](#라즈베리-파이-5-구조)
+- [아이폰 연동 - 핫스팟 (파트 1)](../hotspot/README.md)
 
 <br><br><br>
 
@@ -81,6 +82,11 @@
 - Performance: GPU, Overlay File, Fan 설정 등
 - Localisation: 국가 또는 글자, 시간 설정이 가능
 
+
+<br><br><br>
+
+## 아이폰 연동
+- [핫스팟 (파트 1)](../hotspot/README.md): 버튼 1개 웹앱으로 아이폰 개인용 핫스팟 켜기/끄기 ([웹앱 열기](https://cheul0518.github.io/RaspberryPi/hotspot/))
 
 <br><br><br>
 

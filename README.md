@@ -21,3 +21,4 @@ Welcome! Please choose your language:
 14. example + circut: gpio - led A - resistor  + led B (duty cycle 50%) - resistor - -> gnd 
 15. pigpio? raspberry 5 is not compatible with (for raspberry pi 4 is recommended)
 16. git -> upload 
+17. iPhone - hotspot (part 1) → [hotspot](./hotspot/README.md)
