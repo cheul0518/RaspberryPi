@@ -44,12 +44,39 @@
 3. 처음 누를 때 단축어 실행 허용 확인이 뜨면 허용
 
 ### 3. 파이가 핫스팟에 자동 접속하게 (라즈베리 파이에서 한 번만)
+목표: **1순위 아이폰 핫스팟, 2순위 지금 쓰는 Wi-Fi**. 핫스팟이 켜지면 30초 안에 자동으로 넘어가고, 꺼지면 원래 Wi-Fi로 돌아감.
+
+아이폰: 설정 → 개인용 핫스팟 → **"호환성 최대화"** 켜기 (연결 안정). 핫스팟 이름은 설정 → 일반 → 정보 → 이름.
+
+**① 핫스팟 저장 + 우선순위 지정** (아이폰 핫스팟을 켜 둔 상태에서)
 ```bash
 sudo nmcli dev wifi connect "핫스팟 이름" password "비밀번호"
-nmcli connection show   # 저장된 Wi-Fi 확인. 집 Wi-Fi와 핫스팟 중 잡히는 쪽에 자동 접속
+nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 저장된 Wi-Fi 이름 확인
+
+sudo nmcli connection modify "핫스팟 이름" connection.autoconnect-priority 10   # 1순위
+sudo nmcli connection modify "지금 Wi-Fi 이름" connection.autoconnect-priority 5  # 2순위
 ```
-- 아이폰: 설정 → 개인용 핫스팟 → **"호환성 최대화"** 켜기 (연결 안정)
-- 연결된 기기가 없으면 아이폰이 잠시 뒤 핫스팟을 꺼 버림 → 파이 전원을 켠 뒤 접속될 때까지 기다리기
+- 우선순위 숫자가 클수록 먼저 접속 (부팅할 때 둘 다 보이면 핫스팟 선택)
+- 핫스팟이 꺼지면 NetworkManager가 자동으로 2순위 Wi-Fi에 다시 접속
+
+**② 이미 다른 Wi-Fi에 붙어 있을 때도 핫스팟으로 넘어가게**
+
+NetworkManager는 연결된 상태에서는 더 높은 순위 Wi-Fi가 나타나도 스스로 바꾸지 않음. 그래서 30초마다 핫스팟이 보이는지 확인해서 전환하는 스크립트를 등록 ([pi/](./pi/)).
+```bash
+# 저장소의 hotspot/pi 폴더에서
+sudo cp hotspot-priority.sh /usr/local/bin/
+sudo cp hotspot-priority.service hotspot-priority.timer /etc/systemd/system/
+sudo nano /etc/systemd/system/hotspot-priority.service   # "핫스팟 이름"을 실제 이름으로 수정
+sudo systemctl daemon-reload
+sudo systemctl enable --now hotspot-priority.timer
+
+# 확인
+systemctl list-timers hotspot-priority.timer
+journalctl -u hotspot-priority -n 20     # "핫스팟 발견 → 전환" 로그
+nmcli -g GENERAL.CONNECTION device show wlan0   # 지금 연결된 Wi-Fi
+```
+- 핫스팟을 30초마다 검색할 때 Wi-Fi가 아주 잠깐 느려질 수 있음 (간격은 `.timer`의 `OnUnitActiveSec`로 조절)
+- 끄려면: `sudo systemctl disable --now hotspot-priority.timer`
 
 <br><br><br>
 
@@ -78,7 +105,8 @@ location.href = url;
 | "'핫스팟 끄기' 단축어를 찾을 수 없습니다" | 단축어가 없거나 이름이 다름 → 위 1번대로 이름 정확히 만들기 |
 | 버튼 표시와 실제 핫스팟 상태가 다름 | 웹앱은 실제 상태를 읽을 수 없음 (제어센터에서 따로 바꾼 경우) → 한 번 더 누르면 맞춰짐 |
 | 단축어 실행 후 Safari 탭으로 열림 | 정상. 홈 화면 아이콘을 Safari로 열리게 하려면 추가할 때 "웹 앱으로 열기" 끄기 |
-| 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기 |
+| 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기, `journalctl -u hotspot-priority`로 로그 확인 |
+| 파이가 핫스팟으로 안 넘어감 | 서비스 파일의 핫스팟 이름이 `nmcli connection show`의 이름과 정확히 같은지 확인 |
 
 <br><br><br>
 
