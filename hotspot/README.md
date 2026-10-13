@@ -55,10 +55,19 @@
 **① 핫스팟 저장 + 우선순위 지정** (아이폰 핫스팟을 켜 둔 상태에서)
 ```bash
 sudo nmcli dev wifi connect "iPhone" password "비밀번호"
-nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 저장된 Wi-Fi 이름 확인
+nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 저장된 Wi-Fi 목록에 iPhone, iptime 이 있는지 확인 (lo 는 무시)
 
 sudo nmcli connection modify "iPhone" connection.autoconnect-priority 10   # 1순위
 sudo nmcli connection modify "iptime" connection.autoconnect-priority 5  # 2순위
+
+nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 순위가 바뀌었는지 다시 확인
+```
+정상이면 이렇게 나옴 (순서는 다를 수 있음):
+```
+NAME    TYPE      AUTOCONNECT-PRIORITY
+iPhone  wifi      10
+iptime  wifi      5
+lo      loopback  0
 ```
 - `"iPhone"` = 아이폰 핫스팟 이름, `"iptime"` = 지금 쓰는 Wi-Fi 연결 이름 (`nmcli connection show`로 확인). 다르면 그 부분만 바꾸기
 - 우선순위 숫자가 클수록 먼저 접속 (부팅할 때 둘 다 보이면 핫스팟 선택)
@@ -83,16 +92,24 @@ sudo cp hotspot-priority.service hotspot-priority.timer /etc/systemd/system/
 
 # 3) 서비스 파일에 핫스팟 이름 넣기 (핫스팟 이름이 iPhone이 아니면 "iPhone"만 바꿔서 실행)
 sudo sed -i 's|^ExecStart=.*|ExecStart=/usr/local/bin/hotspot-priority.sh "iPhone"|' /etc/systemd/system/hotspot-priority.service
-grep ExecStart /etc/systemd/system/hotspot-priority.service   # 바뀌었는지 확인
+grep ExecStart /etc/systemd/system/hotspot-priority.service
+# ↑ 정상: ExecStart=/usr/local/bin/hotspot-priority.sh "iPhone"   (따옴표 안이 핫스팟 이름과 같으면 OK)
 
 # 4) 켜기
 sudo systemctl daemon-reload
 sudo systemctl enable --now hotspot-priority.timer
 
-# 확인
-systemctl list-timers hotspot-priority.timer     # 다음 실행 시각이 보이면 정상
-journalctl -u hotspot-priority -n 20             # "핫스팟 발견 → 전환" 로그
-nmcli -g GENERAL.CONNECTION device show wlan0    # 지금 연결된 Wi-Fi
+# 5) 확인
+systemctl list-timers hotspot-priority.timer
+# ↑ 정상: hotspot-priority.timer 줄이 있고, NEXT(다음 실행 시각)가 30초 이내로 표시됨
+#   "0 timers listed" 가 나오면 4) 를 다시 실행
+
+nmcli -g GENERAL.CONNECTION device show wlan0
+# ↑ 핫스팟을 켜고 30초쯤 뒤: iPhone 이 나오면 성공 (핫스팟을 끄면 잠시 뒤 iptime)
+
+journalctl -u hotspot-priority -n 20
+# ↑ 전환된 적이 있으면: "핫스팟 'iPhone' 발견 → 전환" 줄이 보임
+#   이미 iPhone 에 붙어 있거나 핫스팟이 꺼져 있으면 아무 메시지 없이 실행만 기록됨 (정상)
 ```
 
 **명령어 설명 (설치)**
