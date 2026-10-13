@@ -64,10 +64,13 @@ if (s) history.replaceState(null, '', here);
 btn.addEventListener('click', () => {
   const next = !on;
   on = next; save(on); render(on);   // 버튼은 바로 눌린/원위치 상태로 바뀜
-  // 자동 복귀(x-success)를 쓰면 iOS가 돌아올 때마다 Safari 새 탭을 만들어서 쓰지 않습니다.
-  // 상태는 위에서 이미 저장했으므로, 단축어 실행 후 왼쪽 위 "◀" 로 돌아오면 같은 화면 그대로입니다.
+  // 단축어 실행 후 자동 복귀: iOS 26의 webapp:// 주소로 홈 화면 웹앱(이 창)을 다시 엽니다.
+  // https:// 로 돌아오면 Safari 새 탭이 생기므로 쓰지 않습니다.
+  // webapp:// 은 주소 뒤 경로·파라미터를 무시하므로, 상태는 위에서 미리 저장해 둡니다.
   // 공백이 '+'가 아닌 %20 으로 들어가야 단축어 이름이 정확히 맞습니다
-  const url = 'shortcuts://run-shortcut?name=' + encodeURIComponent(next ? SHORTCUT_ON : SHORTCUT_OFF);
+  const back = encodeURIComponent('webapp://' + location.host + location.pathname);
+  const url = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent(next ? SHORTCUT_ON : SHORTCUT_OFF)
+    + '&x-success=' + back + '&x-cancel=' + back + '&x-error=' + back;
   setTimeout(() => { location.href = url; }, 180);
 });
 </script>

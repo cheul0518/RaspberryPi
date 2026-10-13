@@ -18,7 +18,7 @@
 ```
 - **웹앱**: HTML + CSS + JavaScript 한 파일(`index.html`). GitHub Pages로 무료 호스팅
 - **단축어(Shortcuts)**: 아이폰 기본 앱. "개인용 핫스팟 설정" 동작으로 실제 핫스팟을 켜고 끔
-- 단축어 실행 후 화면 왼쪽 위 **◀** (이전 앱으로 돌아가기)를 누르면 원래 화면으로 복귀 (새 탭이 생기지 않음)
+- 단축어 실행 후 `webapp://` 주소(iOS 26)로 홈 화면 웹앱에 자동 복귀. 안 되면 왼쪽 위 **◀** 로 복귀 (새 탭은 생기지 않음)
 - 파이가 아니라 인터넷(GitHub Pages)에 올린 이유: 핫스팟이 꺼진 상태에서도 페이지가 열려야 하기 때문
 
 <br><br><br>
@@ -106,11 +106,14 @@ const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
 
 // 버튼을 누르면: 화면을 먼저 ON/OFF로 바꾸고 단축어 실행
-const url = 'shortcuts://run-shortcut?name=' + encodeURIComponent(이름);
+const back = encodeURIComponent('webapp://' + location.host + location.pathname);  // 홈 화면 웹앱 주소
+const url = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent(이름)
+  + '&x-success=' + back + '&x-cancel=' + back + '&x-error=' + back;
 location.href = url;
 ```
 - 버튼 상태는 단축어를 부르기 **전에** `localStorage`에 저장 → 단축어 실행 후 왼쪽 위 **◀** 로 돌아오면 같은 탭, 같은 화면
-- 자동 복귀(`x-callback-url`의 `x-success`)는 쓰지 않음: iOS가 돌아올 때마다 Safari **새 탭**을 만들기 때문
+- 자동 복귀는 `x-callback-url`의 `x-success`에 `webapp://도메인/경로` 사용 (iOS 26부터 홈 화면 웹앱을 여는 주소). `https://`로 돌아오게 하면 Safari **새 탭**이 생김
+- `webapp://`은 경로·파라미터를 무시하고 앱만 열어서, 상태는 단축어 실행 **전에** 저장. 일부 iOS 버전에서는 "주소가 유효하지 않음" 오류가 난다는 보고도 있음 → 그때는 **◀** 로 복귀
 - 공백은 반드시 `%20`으로 인코딩 (`URLSearchParams`는 공백을 `+`로 바꿔 단축어 이름이 안 맞음)
 - 눌린 버튼 효과: CSS에서 `transform: scale(.92)` + 안쪽 그림자(`inset box-shadow`)
 
@@ -122,7 +125,7 @@ location.href = url;
 | "'핫스팟 끄기' 단축어를 찾을 수 없습니다" | 단축어가 없거나 이름이 다름 → 위 1번대로 이름 정확히 만들기 |
 | 버튼 표시와 실제 핫스팟 상태가 다름 | 웹앱은 실제 상태를 읽을 수 없음 (제어센터에서 따로 바꾼 경우) → 한 번 더 누르면 맞춰짐 |
 | 실행할 때마다 Safari 새 탭이 생김 | 홈 화면 아이콘이 Safari 탭으로 열리는 상태. 아이콘 삭제 → 탭 정리 → **"웹 앱으로 열기" 켜고** 다시 추가 (2번 참고) |
-| 단축어 실행 후 단축어 앱에 머묾 | 정상. 왼쪽 위 **◀** 를 누르면 원래 화면으로 돌아감 |
+| 단축어 실행 후 단축어 앱에 머묾 / "주소가 유효하지 않음" | 이 iOS에서 `webapp://` 복귀가 안 되는 경우. 핫스팟은 이미 바뀌었으니 왼쪽 위 **◀** 로 돌아가기 |
 | 단축어 실행에 실패했는데 버튼은 바뀜 | 버튼을 한 번 더 눌러 맞추기 (단축어 이름 확인) |
 | 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기, `journalctl -u hotspot-priority`로 로그 확인 |
 | 파이가 핫스팟으로 안 넘어감 | 서비스 파일의 핫스팟 이름이 `nmcli connection show`의 이름과 정확히 같은지 확인 |
