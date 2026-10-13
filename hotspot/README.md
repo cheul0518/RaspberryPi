@@ -92,6 +92,32 @@ journalctl -u hotspot-priority -n 20             # "핫스팟 발견 → 전환"
 nmcli -g GENERAL.CONNECTION device show wlan0    # 지금 연결된 Wi-Fi
 ```
 
+**명령어 설명 (설치)**
+| 명령어 | 하는 일 |
+|-----|-----|
+| `git clone https://github.com/...` | GitHub 저장소 파일을 파이로 통째로 내려받기 (`~/RaspberryPi` 폴더 생성) |
+| `sudo cp hotspot-priority.sh /usr/local/bin/` | 스크립트를 시스템 프로그램 폴더로 복사 (어디서든 실행 가능) |
+| `sudo chmod +x ...` | 스크립트에 실행 권한 주기 |
+| `sudo cp *.service *.timer /etc/systemd/system/` | systemd(리눅스 자동 실행 관리자)에 "무엇을"(service), "언제"(timer) 실행할지 등록 |
+| `sudo sed -i 's/핫스팟 이름/실제이름/' ...` | 서비스 파일 안의 "핫스팟 이름" 글자를 실제 이름으로 바꾸기 (`s/찾을것/바꿀것/`) |
+| `sudo systemctl daemon-reload` | systemd에게 새 파일을 다시 읽으라고 알림 |
+| `sudo systemctl enable --now ...timer` | 타이머를 지금 바로 시작(`--now`) + 부팅 때마다 자동 시작(`enable`) |
+
+**명령어 설명 (30초마다 실행되는 것)**
+
+타이머(`hotspot-priority.timer`)가 부팅 20초 후(`OnBootSec=20`)부터 30초마다(`OnUnitActiveSec=30`) 서비스(`hotspot-priority.service`)를 실행 → 서비스가 스크립트(`hotspot-priority.sh "핫스팟이름"`)를 실행. 스크립트 안에서 하는 일:
+
+| 순서 | 명령어 | 하는 일 |
+|-----|-----|-----|
+| 1 | `nmcli -g GENERAL.CONNECTION device show wlan0` | 지금 Wi-Fi(wlan0)에 연결된 이름 확인 → 이미 핫스팟이면 여기서 끝 |
+| 2 | `nmcli -g SSID device wifi list ifname wlan0 --rescan yes` | 주변 Wi-Fi를 새로 검색해서 이름 목록 가져오기 |
+| 3 | `grep -Fxq "핫스팟이름"` | 그 목록에 핫스팟 이름이 정확히 있는지 확인 (`-F` 글자 그대로, `-x` 한 줄 전체 일치, `-q` 결과만) |
+| 4 | `nmcli connection up id "핫스팟이름" ifname wlan0` | 있으면 저장된 핫스팟 연결로 전환. 없으면 아무것도 안 함 (기존 Wi-Fi 유지) |
+
+- `nmcli`: NetworkManager(Raspberry Pi OS의 네트워크 관리자)를 명령어로 조작하는 도구
+- `-g 항목`: 필요한 값만 깔끔하게 출력
+- 로그 보기: `journalctl -u hotspot-priority -n 20` (전환될 때 "핫스팟 발견 → 전환" 출력)
+
 주의할 점
 - 스크립트는 **연결 이름 = 핫스팟 이름(SSID)** 이라고 가정. ①처럼 `nmcli dev wifi connect`로 저장하면 자동으로 같아짐. `nmcli connection show`에 보이는 이름을 그대로 쓰기
 - 아이폰 핫스팟은 연결된 기기가 없으면 잠시 뒤 신호를 멈추거나 꺼짐 → 파이가 못 찾으면 아이폰에서 **설정 → 개인용 핫스팟 화면을 열어 둔 채** 30초 정도 기다리기
