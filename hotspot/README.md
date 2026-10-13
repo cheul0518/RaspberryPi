@@ -68,9 +68,11 @@ sudo nmcli connection modify "지금 Wi-Fi 이름" connection.autoconnect-priori
 NetworkManager는 이미 연결된 상태에서는 더 높은 순위 Wi-Fi가 나타나도 스스로 갈아타지 않음 (①의 순위는 부팅·재접속할 때만 적용). 그래서 30초마다 핫스팟이 보이는지 확인해서 전환하는 스크립트를 등록 ([pi/](./pi/)).
 
 ```bash
-# 1) 파일 받기 (이미 받았다면 cd 후 git pull)
+# 1) 파일 받기
 cd ~
-git clone https://github.com/cheul0518/RaspberryPi.git
+git clone https://github.com/cheul0518/RaspberryPi.git   # 처음 한 번만
+# 이미 받은 적 있으면 clone 대신 최신 내용만 받기:
+#   cd ~/RaspberryPi && git pull
 cd ~/RaspberryPi/hotspot/pi
 
 # 2) 설치
@@ -96,7 +98,8 @@ nmcli -g GENERAL.CONNECTION device show wlan0    # 지금 연결된 Wi-Fi
 **명령어 설명 (설치)**
 | 명령어 | 하는 일 |
 |-----|-----|
-| `git clone https://github.com/...` | GitHub 저장소 파일을 파이로 통째로 내려받기 (`~/RaspberryPi` 폴더 생성) |
+| `git clone https://github.com/...` | GitHub 저장소 파일을 파이로 통째로 내려받기 (`~/RaspberryPi` 폴더 생성, 처음 한 번만) |
+| `git pull` | 이미 받은 폴더(`~/RaspberryPi`) 안에서 실행하면 GitHub의 바뀐 내용만 받아 최신으로 맞춤 |
 | `sudo cp hotspot-priority.sh /usr/local/bin/` | 스크립트를 시스템 프로그램 폴더로 복사 (어디서든 실행 가능) |
 | `sudo chmod +x ...` | 스크립트에 실행 권한 주기 |
 | `sudo cp *.service *.timer /etc/systemd/system/` | systemd(리눅스 자동 실행 관리자)에 "무엇을"(service), "언제"(timer) 실행할지 등록 |
