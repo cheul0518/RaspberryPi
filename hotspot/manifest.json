@@ -1,0 +1,10 @@
+{
+  "name": "핫스팟",
+  "short_name": "핫스팟",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#34c759",
+  "icons": [{ "src": "icon.png", "sizes": "180x180", "type": "image/png" }]
+}
