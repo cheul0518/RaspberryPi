@@ -59,13 +59,10 @@ if (s) history.replaceState(null, '', here);
 btn.addEventListener('click', () => {
   const next = !on;
   on = next; save(on); render(on);   // 버튼은 바로 눌린/원위치 상태로 바뀜
-  const back = v => here + '?s=' + (v ? 'on' : 'off');
+  // 자동 복귀(x-success)를 쓰면 iOS가 돌아올 때마다 Safari 새 탭을 만들어서 쓰지 않습니다.
+  // 상태는 위에서 이미 저장했으므로, 단축어 실행 후 왼쪽 위 "◀" 로 돌아오면 같은 화면 그대로입니다.
   // 공백이 '+'가 아닌 %20 으로 들어가야 단축어 이름이 정확히 맞습니다
-  const e = encodeURIComponent;
-  const url = 'shortcuts://x-callback-url/run-shortcut?name=' + e(next ? SHORTCUT_ON : SHORTCUT_OFF)
-    + '&x-success=' + e(back(next))
-    + '&x-cancel=' + e(back(!next))   // 취소/실패하면 원래 상태로 되돌림
-    + '&x-error=' + e(back(!next));
+  const url = 'shortcuts://run-shortcut?name=' + encodeURIComponent(next ? SHORTCUT_ON : SHORTCUT_OFF);
   setTimeout(() => { location.href = url; }, 180);
 });
 </script>
