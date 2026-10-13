@@ -62,21 +62,38 @@ sudo nmcli connection modify "지금 Wi-Fi 이름" connection.autoconnect-priori
 
 **② 이미 다른 Wi-Fi에 붙어 있을 때도 핫스팟으로 넘어가게**
 
-NetworkManager는 연결된 상태에서는 더 높은 순위 Wi-Fi가 나타나도 스스로 바꾸지 않음. 그래서 30초마다 핫스팟이 보이는지 확인해서 전환하는 스크립트를 등록 ([pi/](./pi/)).
+NetworkManager는 이미 연결된 상태에서는 더 높은 순위 Wi-Fi가 나타나도 스스로 갈아타지 않음 (①의 순위는 부팅·재접속할 때만 적용). 그래서 30초마다 핫스팟이 보이는지 확인해서 전환하는 스크립트를 등록 ([pi/](./pi/)).
+
 ```bash
-# 저장소의 hotspot/pi 폴더에서
+# 1) 파일 받기 (이미 받았다면 cd 후 git pull)
+cd ~
+git clone https://github.com/cheul0518/RaspberryPi.git
+cd ~/RaspberryPi/hotspot/pi
+
+# 2) 설치
 sudo cp hotspot-priority.sh /usr/local/bin/
+sudo chmod +x /usr/local/bin/hotspot-priority.sh
 sudo cp hotspot-priority.service hotspot-priority.timer /etc/systemd/system/
-sudo nano /etc/systemd/system/hotspot-priority.service   # "핫스팟 이름"을 실제 이름으로 수정
+
+# 3) "핫스팟 이름"을 실제 이름으로 바꾸기 (①에서 저장한 이름과 똑같이)
+sudo sed -i 's/핫스팟 이름/여기에 실제 핫스팟 이름/' /etc/systemd/system/hotspot-priority.service
+grep ExecStart /etc/systemd/system/hotspot-priority.service   # 바뀌었는지 확인
+
+# 4) 켜기
 sudo systemctl daemon-reload
 sudo systemctl enable --now hotspot-priority.timer
 
 # 확인
-systemctl list-timers hotspot-priority.timer
-journalctl -u hotspot-priority -n 20     # "핫스팟 발견 → 전환" 로그
-nmcli -g GENERAL.CONNECTION device show wlan0   # 지금 연결된 Wi-Fi
+systemctl list-timers hotspot-priority.timer     # 다음 실행 시각이 보이면 정상
+journalctl -u hotspot-priority -n 20             # "핫스팟 발견 → 전환" 로그
+nmcli -g GENERAL.CONNECTION device show wlan0    # 지금 연결된 Wi-Fi
 ```
-- 핫스팟을 30초마다 검색할 때 Wi-Fi가 아주 잠깐 느려질 수 있음 (간격은 `.timer`의 `OnUnitActiveSec`로 조절)
+
+주의할 점
+- 스크립트는 **연결 이름 = 핫스팟 이름(SSID)** 이라고 가정. ①처럼 `nmcli dev wifi connect`로 저장하면 자동으로 같아짐. `nmcli connection show`에 보이는 이름을 그대로 쓰기
+- 아이폰 핫스팟은 연결된 기기가 없으면 잠시 뒤 신호를 멈추거나 꺼짐 → 파이가 못 찾으면 아이폰에서 **설정 → 개인용 핫스팟 화면을 열어 둔 채** 30초 정도 기다리기
+- 30초마다 주변 Wi-Fi를 검색하므로 그 순간 Wi-Fi가 아주 잠깐 느려질 수 있음 (간격은 `.timer`의 `OnUnitActiveSec`로 조절)
+- 핫스팟을 끄면 NetworkManager가 자동으로 ②순위 Wi-Fi에 다시 접속 (스크립트는 핫스팟으로 "넘어가는" 일만 함)
 - 끄려면: `sudo systemctl disable --now hotspot-priority.timer`
 
 <br><br><br>
