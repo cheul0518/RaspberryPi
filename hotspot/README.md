@@ -79,7 +79,8 @@ sudo chmod +x /usr/local/bin/hotspot-priority.sh
 sudo cp hotspot-priority.service hotspot-priority.timer /etc/systemd/system/
 
 # 3) "핫스팟 이름"을 실제 이름으로 바꾸기 (①에서 저장한 이름과 똑같이)
-sudo sed -i 's/핫스팟 이름/여기에 실제 핫스팟 이름/' /etc/systemd/system/hotspot-priority.service
+# 아래 "iPhone" 자리에 실제 핫스팟 이름 (설정 → 일반 → 정보 → 이름)
+sudo sed -i 's|^ExecStart=.*|ExecStart=/usr/local/bin/hotspot-priority.sh "iPhone"|' /etc/systemd/system/hotspot-priority.service
 grep ExecStart /etc/systemd/system/hotspot-priority.service   # 바뀌었는지 확인
 
 # 4) 켜기
@@ -99,7 +100,7 @@ nmcli -g GENERAL.CONNECTION device show wlan0    # 지금 연결된 Wi-Fi
 | `sudo cp hotspot-priority.sh /usr/local/bin/` | 스크립트를 시스템 프로그램 폴더로 복사 (어디서든 실행 가능) |
 | `sudo chmod +x ...` | 스크립트에 실행 권한 주기 |
 | `sudo cp *.service *.timer /etc/systemd/system/` | systemd(리눅스 자동 실행 관리자)에 "무엇을"(service), "언제"(timer) 실행할지 등록 |
-| `sudo sed -i 's/핫스팟 이름/실제이름/' ...` | 서비스 파일 안의 "핫스팟 이름" 글자를 실제 이름으로 바꾸기 (`s/찾을것/바꿀것/`) |
+| `sudo sed -i 's\|^ExecStart=.*\|ExecStart=... "iPhone"\|' ...` | 서비스 파일에서 `ExecStart=`로 시작하는 줄을 실제 핫스팟 이름이 들어간 줄로 통째로 바꾸기. `sed`는 글자 찾아 바꾸기 명령, `s\|찾을것\|바꿀것\|` 형식(구분 기호로 `/` 대신 `\|` 사용), `^`는 줄의 시작, `.*`는 나머지 전부, `-i`는 파일에 바로 저장 |
 | `sudo systemctl daemon-reload` | systemd에게 새 파일을 다시 읽으라고 알림 |
 | `sudo systemctl enable --now ...timer` | 타이머를 지금 바로 시작(`--now`) + 부팅 때마다 자동 시작(`enable`) |
 
