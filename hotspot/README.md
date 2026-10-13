@@ -15,7 +15,7 @@
 
 ## 구조
 ```
-[홈 화면 아이콘(웹앱)] --버튼--> [단축어 앱: 핫스팟 켜기/끄기] --왼쪽 위 ◀ 로 복귀--> [같은 웹앱 화면: ON/OFF 표시]
+[홈 화면 아이콘(웹앱)] --버튼--> [단축어 앱: 핫스팟 켜기/끄기] --자동 복귀(webapp://)--> [같은 웹앱 화면: ON/OFF 표시]
 ```
 - **웹앱**: HTML + CSS + JavaScript 한 파일(`index.html`). GitHub Pages로 무료 호스팅
 - **단축어(Shortcuts)**: 아이폰 기본 앱. "개인용 핫스팟 설정" 동작으로 실제 핫스팟을 켜고 끔
@@ -54,7 +54,7 @@
 
 **① 핫스팟 저장 + 우선순위 지정** (아이폰 핫스팟을 켜 둔 상태에서)
 ```bash
-sudo nmcli dev wifi connect "iPhone" password "비밀번호"
+sudo nmcli dev wifi connect "iPhone" password "비밀번호"   # "비밀번호" 자리에 아이폰 핫스팟 비밀번호 (설정 → 개인용 핫스팟)
 nmcli -f NAME,TYPE,AUTOCONNECT-PRIORITY connection show   # 저장된 Wi-Fi 목록에 iPhone, iptime 이 있는지 확인 (lo 는 무시)
 
 sudo nmcli connection modify "iPhone" connection.autoconnect-priority 10   # 1순위
@@ -126,24 +126,24 @@ journalctl -u hotspot-priority -n 20
 
 **명령어 설명 (30초마다 실행되는 것)**
 
-타이머(`hotspot-priority.timer`)가 부팅 20초 후(`OnBootSec=20`)부터 30초마다(`OnUnitActiveSec=30`) 서비스(`hotspot-priority.service`)를 실행 → 서비스가 스크립트(`hotspot-priority.sh "핫스팟이름"`)를 실행. 스크립트 안에서 하는 일:
+타이머(`hotspot-priority.timer`)가 부팅 20초 후(`OnBootSec=20`)부터 30초마다(`OnUnitActiveSec=30`) 서비스(`hotspot-priority.service`)를 실행 → 서비스가 스크립트(`hotspot-priority.sh "iPhone"`)를 실행. 스크립트 안에서 하는 일:
 
 | 순서 | 명령어 | 하는 일 |
 |-----|-----|-----|
 | 1 | `nmcli -g GENERAL.CONNECTION device show wlan0` | 지금 Wi-Fi(wlan0)에 연결된 이름 확인 → 이미 핫스팟이면 여기서 끝 |
 | 2 | `nmcli -g SSID device wifi list ifname wlan0 --rescan yes` | 주변 Wi-Fi를 새로 검색해서 이름 목록 가져오기 |
-| 3 | `grep -Fxq "핫스팟이름"` | 그 목록에 핫스팟 이름이 정확히 있는지 확인 (`-F` 글자 그대로, `-x` 한 줄 전체 일치, `-q` 결과만) |
-| 4 | `nmcli connection up id "핫스팟이름" ifname wlan0` | 있으면 저장된 핫스팟 연결로 전환. 없으면 아무것도 안 함 (기존 Wi-Fi 유지) |
+| 3 | `grep -Fxq "iPhone"` | 그 목록에 핫스팟 이름이 정확히 있는지 확인 (`-F` 글자 그대로, `-x` 한 줄 전체 일치, `-q` 결과만) |
+| 4 | `nmcli connection up id "iPhone" ifname wlan0` | 있으면 저장된 핫스팟 연결로 전환. 없으면 아무것도 안 함 (기존 Wi-Fi 유지) |
 
 - `nmcli`: NetworkManager(Raspberry Pi OS의 네트워크 관리자)를 명령어로 조작하는 도구
 - `-g 항목`: 필요한 값만 깔끔하게 출력
-- 로그 보기: `journalctl -u hotspot-priority -n 20` (전환될 때 "핫스팟 발견 → 전환" 출력)
+- 로그 보기: `journalctl -u hotspot-priority -n 20` (전환될 때 "핫스팟 'iPhone' 발견 → 전환" 출력)
 
 주의할 점
 - 스크립트는 **연결 이름 = 핫스팟 이름(SSID)** 이라고 가정. ①처럼 `nmcli dev wifi connect`로 저장하면 자동으로 같아짐. `nmcli connection show`에 보이는 이름을 그대로 쓰기
 - 아이폰 핫스팟은 연결된 기기가 없으면 잠시 뒤 신호를 멈추거나 꺼짐 → 파이가 못 찾으면 아이폰에서 **설정 → 개인용 핫스팟 화면을 열어 둔 채** 30초 정도 기다리기
 - 30초마다 주변 Wi-Fi를 검색하므로 그 순간 Wi-Fi가 아주 잠깐 느려질 수 있음 (간격은 `.timer`의 `OnUnitActiveSec`로 조절)
-- 핫스팟을 끄면 NetworkManager가 자동으로 ②순위 Wi-Fi에 다시 접속 (스크립트는 핫스팟으로 "넘어가는" 일만 함)
+- 핫스팟을 끄면 NetworkManager가 자동으로 2순위 Wi-Fi(iptime)에 다시 접속 (스크립트는 핫스팟으로 "넘어가는" 일만 함)
 - 끄려면: `sudo systemctl disable --now hotspot-priority.timer`
 
 <br><br><br>
@@ -159,7 +159,7 @@ const url = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent
   + '&x-success=' + back + '&x-cancel=' + back + '&x-error=' + back;
 location.href = url;
 ```
-- 버튼 상태는 단축어를 부르기 **전에** `localStorage`에 저장 → 단축어 실행 후 왼쪽 위 **◀** 로 돌아오면 같은 탭, 같은 화면
+- 버튼 상태는 단축어를 부르기 **전에** `localStorage`(브라우저 저장소)에 저장 → 웹앱으로 돌아왔을 때 같은 ON/OFF 화면 유지
 - 자동 복귀는 `x-callback-url`의 `x-success`에 `webapp://도메인/경로` 사용 (iOS 26부터 홈 화면 웹앱을 여는 주소). `https://`로 돌아오게 하면 Safari **새 탭**이 생김
 - `webapp://`은 경로·파라미터를 무시하고 앱만 열어서, 상태는 단축어 실행 **전에** 저장. 일부 iOS 버전에서는 "주소가 유효하지 않음" 오류가 난다는 보고도 있음 → 그때는 **◀** 로 복귀
 - 공백은 반드시 `%20`으로 인코딩 (`URLSearchParams`는 공백을 `+`로 바꿔 단축어 이름이 안 맞음)

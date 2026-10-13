@@ -1,7 +1,7 @@
 #!/bin/bash
 # 아이폰 핫스팟이 보이면 핫스팟으로 전환 (1순위).
 # 핫스팟이 없으면 아무것도 안 함 → NetworkManager가 기존 Wi-Fi(2순위)를 유지/재접속.
-# 사용: hotspot-priority.sh "iPhone"   (따옴표 안은 아이폰 핫스팟 이름)   (systemd 타이머가 30초마다 실행)
+# 사용: hotspot-priority.sh "iPhone"   (따옴표 안은 아이폰 핫스팟 이름, systemd 타이머가 30초마다 실행)
 
 HOTSPOT="$1"
 IFACE="${2:-wlan0}"
