@@ -1,11 +1,13 @@
 # 아이폰 연동 - 핫스팟 (파트 1)
 
-아이폰에서 앱처럼 실행되는 **버튼 1개짜리 웹앱**으로 아이폰의 **개인용 핫스팟을 켜고 끄기**.
-라즈베리 파이를 휴대폰과 연결하기 위한 첫 단계 (파이가 아이폰 핫스팟에 자동 접속 → 이후 파트에서 파이 제어).
+아이폰에서 앱처럼 실행되는 **탭 3개짜리 웹앱**.
+- **1번 탭 (핫스팟)**: 버튼 1개로 아이폰 **개인용 핫스팟 켜고 끄기** (파트 1)
+- **2번 탭 (GPIO)**: 라즈베리 파이 5 **핀아웃**을 보고, 누른 **GPIO를 ON/OFF** (파트 2 → [아래 설명](#파트-2-gpio-탭-라즈베리-파이-5-핀아웃))
+- **3번 탭**: 비워 둠 (다음 기능용)
 
 - 웹앱 주소: https://cheul0518.github.io/RaspberryPi/hotspot/
-- 동작: 버튼을 누르면 눌린 채로 **ON** + 핫스팟 켜짐, 다시 누르면 원위치 **OFF** + 핫스팟 꺼짐
-- 확인 환경: iPhone 17 (iOS 26), 홈 화면 웹앱 → 단축어 실행 → 웹앱으로 자동 복귀 동작 확인 (2026-10-13)
+- 1번 탭 동작: 버튼을 누르면 눌린 채로 **ON** + 핫스팟 켜짐, 다시 누르면 원위치 **OFF** + 핫스팟 꺼짐
+- 확인 환경: iPhone 17 (iOS 26), 홈 화면 웹앱 → 단축어 실행 → 웹앱으로 자동 복귀 동작 확인 (2026-10-13, 1번 탭)
 
 | OFF | ON |
 |-----|-----|
@@ -148,10 +150,89 @@ journalctl -u hotspot-priority -n 20
 
 <br><br><br>
 
+## 파트 2: GPIO 탭 (라즈베리 파이 5 핀아웃)
+
+<img src="../images/gpio_tab.png" width="260">
+
+2번 탭에 라즈베리 파이 5의 40핀 헤더가 실제 배치대로 나옴 (왼쪽 = 홀수 핀, 오른쪽 = 짝수 핀, 맨 위 = 1번 핀).
+- 색: 주황 = 3.3V, 빨강 = 5V, 검정 = GND(접지), 파랑 = **누를 수 있는 GPIO**, 회색 = ID 핀(HAT 정보용, 사용 안 함)
+- 파란 테두리 GPIO를 누르면 초록색 **ON** + 파이의 그 핀에 3.3V 출력, 다시 누르면 **OFF**
+- 1번 핀 위치: 핀 헤더에서 **USB·LAN 포트 반대쪽 끝**
+- "켜진 GPIO 모두 끄기": 한 번이라도 켠 핀을 전부 OFF
+
+### 구조
+```
+[웹앱 2번 탭] --GPIO 누름--> [단축어: GPIO 제어] --http://raspberrypi.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
+                                     └── 끝나면 webapp:// 로 웹앱 2번 탭에 자동 복귀
+```
+- 왜 단축어를 거칠까? 웹앱은 `https://`(GitHub Pages)인데 파이는 `http://`라서, 보안 규칙(혼합 콘텐츠 차단) 때문에 **웹페이지가 파이에 직접 요청할 수 없음**. 단축어는 이 제한이 없어서 대신 요청을 보냄
+- 그래서 GPIO를 누를 때도 핫스팟 버튼처럼 단축어 화면이 잠깐 보였다가 돌아옴
+- 아이폰과 파이가 **같은 네트워크**(아이폰 핫스팟 또는 같은 iptime Wi-Fi)에 있어야 동작
+
+### 4. 단축어 1개 더 만들기: `GPIO 제어` (아이폰, 한 번만)
+1. 단축어 앱 → `+` → 동작 추가 → `텍스트` 검색 → **텍스트** 추가
+2. 텍스트 칸에 `http://` 입력 → 바로 뒤에 커서를 둔 채, 키보드 위 변수 막대에서 **단축어 입력** 선택
+   - 결과가 `http://` + `[단축어 입력]` 한 칸이 되면 OK (`http://` 뒤에 띄어쓰기 없이)
+3. 동작 추가 → `URL` 검색 → **URL 콘텐츠 가져오기** 추가 → URL 자리가 **텍스트**로 연결돼 있으면 OK (아니면 URL 칸을 눌러 "텍스트" 선택)
+4. 이름을 **`GPIO 제어`** 로 저장 (띄어쓰기 포함 정확히)
+   - 맨 위에 "입력 받기" 칸이 생겨도 그대로 두면 됨
+5. 웹앱 2번 탭에서 처음 누를 때 "**raspberrypi.local**에 연결하도록 허용하겠습니까?" / "로컬 네트워크" 접근 확인이 뜨면 **허용**
+
+단축어가 하는 일: 웹앱이 넘겨준 글자(예: `raspberrypi.local:8000/gpio/17/on`) 앞에 `http://`를 붙여 그 주소를 엶 → 파이 서버가 명령을 받음.
+
+### 5. 파이에 GPIO 서버 설치 (라즈베리 파이에서 한 번만)
+추가 설치 없이 동작 (파이썬 기본 웹 서버 + Raspberry Pi OS에 기본 포함된 `gpiozero`).
+```bash
+# 1) 최신 파일 받기
+cd ~/RaspberryPi && git pull
+cd ~/RaspberryPi/hotspot/pi
+
+# 2) 설치
+sudo cp gpio-server.py /usr/local/bin/
+sudo cp gpio-server.service /etc/systemd/system/
+
+# 3) 켜기 (지금 바로 + 부팅 때마다 자동)
+sudo systemctl daemon-reload
+sudo systemctl enable --now gpio-server
+
+# 4) 확인
+systemctl is-active gpio-server
+# ↑ 정상: active   (failed 가 나오면 아래 journalctl 로 오류 확인)
+
+curl http://localhost:8000/gpio/17/on
+# ↑ 정상: {"pin": 17, "on": true}   (GPIO17에 LED를 연결했다면 켜짐)
+curl http://localhost:8000/gpio/17/off
+# ↑ 정상: {"pin": 17, "on": false}
+
+journalctl -u gpio-server -n 5
+# ↑ 정상: "GPIO 서버 시작: 포트 8000", "GPIO17 → ON", "GPIO17 → OFF" 줄이 보임
+
+hostname
+# ↑ raspberrypi 가 나오면 웹앱의 파이 주소를 그대로(raspberrypi.local:8000) 두면 됨
+#   다른 이름(예: mypi)이 나오면 웹앱 2번 탭 아래 "파이 주소"에 mypi.local:8000 입력
+```
+
+**아이폰에서 연결 확인**: 아이폰 핫스팟에 파이가 붙은 상태에서 Safari로 `http://raspberrypi.local:8000/gpio` 열기
+- 정상: `{}` 또는 `{"17": false}` 같은 글자가 보임
+- "서버에 연결할 수 없음": 파이가 핫스팟에 안 붙었거나 서버가 꺼짐 → 위 4) 확인. 그래도 안 되면 파이에서 `hostname -I`로 나온 IP(예: `172.20.10.2`)를 써서 `172.20.10.2:8000`을 웹앱 "파이 주소"에 입력
+
+### LED로 테스트하기
+GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 → GND(9번 또는 14번 핀). 웹앱 2번 탭에서 **GPIO17**을 누르면 LED가 켜짐.
+
+### 알아 둘 점
+- 웹앱은 파이의 실제 핀 상태를 읽지 못하고 **마지막으로 누른 상태**를 기억함. 파이를 재부팅하면 핀은 모두 OFF가 되지만 웹앱은 ON으로 보일 수 있음 → "켜진 GPIO 모두 끄기" 또는 그 핀을 한 번 더 누르기
+- GPIO는 **3.3V, 약한 전류**만 출력. 모터·릴레이 등은 직접 연결하지 말고 트랜지스터/드라이버 모듈을 거칠 것
+- 같은 iptime Wi-Fi에 있는 다른 사람도 이 주소를 알면 GPIO를 켤 수 있음 (핫스팟에서는 내 폰만 접속)
+- 서버 끄기: `sudo systemctl disable --now gpio-server`
+- 파일 한 줄씩 설명: [pi/README.md](./pi/README.md)
+
+<br><br><br>
+
 ## 코드 핵심 (`index.html`)
 ```js
 const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
+const SHORTCUT_GPIO = 'GPIO 제어';   // 2번 탭: 단축어 입력으로 'raspberrypi.local:8000/gpio/17/on' 같은 주소를 넘김
 
 // 버튼을 누르면: 화면을 먼저 ON/OFF로 바꾸고 단축어 실행
 const back = encodeURIComponent('webapp://' + location.host + location.pathname);  // 홈 화면 웹앱 주소
@@ -159,7 +240,7 @@ const url = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent
   + '&x-success=' + back + '&x-cancel=' + back + '&x-error=' + back;
 location.href = url;
 ```
-- 버튼 상태는 단축어를 부르기 **전에** `localStorage`(브라우저 저장소)에 저장 → 웹앱으로 돌아왔을 때 같은 ON/OFF 화면 유지
+- 탭 번호·버튼 상태·GPIO 상태는 단축어를 부르기 **전에** `localStorage`(브라우저 저장소)에 저장 → 웹앱으로 돌아왔을 때 같은 ON/OFF 화면 유지
 - 자동 복귀는 `x-callback-url`의 `x-success`에 `webapp://도메인/경로` 사용 (iOS 26부터 홈 화면 웹앱을 여는 주소). `https://`로 돌아오게 하면 Safari **새 탭**이 생김
 - `webapp://`은 경로·파라미터를 무시하고 앱만 열어서, 상태는 단축어 실행 **전에** 저장. 일부 iOS 버전에서는 "주소가 유효하지 않음" 오류가 난다는 보고도 있음 → 그때는 **◀** 로 복귀
 - 공백은 반드시 `%20`으로 인코딩 (`URLSearchParams`는 공백을 `+`로 바꿔 단축어 이름이 안 맞음)
@@ -176,6 +257,8 @@ location.href = url;
 | 단축어 실행 후 단축어 앱에 머묾 / "주소가 유효하지 않음" | 이 iOS에서 `webapp://` 복귀가 안 되는 경우. 핫스팟은 이미 바뀌었으니 왼쪽 위 **◀** 로 돌아가기 |
 | 단축어 실행에 실패했는데 버튼은 바뀜 | 버튼을 한 번 더 눌러 맞추기 (단축어 이름 확인) |
 | 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기, `journalctl -u hotspot-priority`로 로그 확인 |
+| "'GPIO 제어' 단축어를 찾을 수 없습니다" | 4번대로 `GPIO 제어` 단축어 만들기 (띄어쓰기 포함) |
+| GPIO를 눌러도 LED가 안 켜짐 | 아이폰 Safari에서 `http://raspberrypi.local:8000/gpio`가 열리는지 확인 (5번 '아이폰에서 연결 확인'), 배선·LED 방향 확인 |
 | 파이가 핫스팟으로 안 넘어감 | 서비스 파일의 핫스팟 이름이 `nmcli connection show`의 이름과 정확히 같은지 확인 |
 
 <br><br><br>
@@ -188,4 +271,4 @@ location.href = url;
 <br><br><br>
 
 ## 다음 파트 예정
-- 파트 2: 핫스팟으로 연결된 라즈베리 파이 제어 (LED 등, 파이에서 FastAPI 서버 + 웹앱)
+- 3번 탭: 비워 둠 (다음에 추가할 기능)

@@ -1,0 +1,11 @@
+[Unit]
+Description=GPIO control server for the iPhone web app
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/gpio-server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

@@ -22,3 +22,4 @@ Welcome! Please choose your language:
 15. pigpio? raspberry 5 is not compatible with (for raspberry pi 4 is recommended)
 16. git -> upload 
 17. iPhone - hotspot (part 1) → [hotspot](./hotspot/README.md)
+18. iPhone - GPIO control tab (part 2) → [hotspot](./hotspot/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃)

@@ -1,13 +1,16 @@
 # pi 폴더 파일 설명 (한 줄씩)
 
-라즈베리 파이가 **아이폰 핫스팟을 1순위로 자동 접속**하게 만드는 파일 3개.
-설치 방법은 [../README.md 3번](../README.md#3-파이가-핫스팟에-자동-접속하게-라즈베리-파이에서-한-번만) 참고.
+라즈베리 파이에 설치하는 파일 5개.
+- 핫스팟 자동 접속 (파트 1): `hotspot-priority.sh`, `.service`, `.timer` → 설치: [../README.md 3번](../README.md#3-파이가-핫스팟에-자동-접속하게-라즈베리-파이에서-한-번만)
+- GPIO 제어 서버 (파트 2): `gpio-server.py`, `gpio-server.service` → 설치: [../README.md 5번](../README.md#5-파이에-gpio-서버-설치-라즈베리-파이에서-한-번만), 설명: [아래 4·5번](#4-gpio-serverpy-gpio-제어-서버)
 
 | 파일 | 역할 | 설치 위치 |
 |-----|-----|-----|
 | `hotspot-priority.sh` | **실제 일을 하는 스크립트**: 핫스팟이 보이면 전환 | `/usr/local/bin/` |
 | `hotspot-priority.service` | **무엇을** 실행할지 systemd에 알려 주는 설정 | `/etc/systemd/system/` |
 | `hotspot-priority.timer` | **언제** 실행할지 (부팅 20초 후부터 30초마다) | `/etc/systemd/system/` |
+| `gpio-server.py` | 아이폰 단축어의 요청을 받아 **GPIO를 켜고 끄는 작은 웹 서버** | `/usr/local/bin/` |
+| `gpio-server.service` | GPIO 서버를 **부팅 때 켜고 계속 켜 두는** systemd 설정 | `/etc/systemd/system/` |
 
 동작 순서: 부팅 → **timer**가 30초마다 → **service**를 실행 → service가 **sh 스크립트**를 실행 → 핫스팟이 보이면 전환
 
@@ -118,10 +121,148 @@
 
 <br><br><br>
 
+## 4. `gpio-server.py` (GPIO 제어 서버)
+
+```python
+1  #!/usr/bin/env python3
+2  # 라즈베리 파이 GPIO 제어 서버 (웹앱 2번 탭 → 아이폰 단축어 "GPIO 제어" → 이 서버)
+3  # 추가 설치 없이 동작: 파이썬 기본 웹 서버 + Raspberry Pi OS에 기본으로 있는 gpiozero
+4  # 주소 예: http://raspberrypi.local:8000/gpio/17/on   (on / off / toggle)
+5  #          http://raspberrypi.local:8000/gpio/all/off  (쓴 핀 모두 끄기)
+6  #          http://raspberrypi.local:8000/gpio          (지금 켜진 핀 목록)
+7  
+8  import json
+9  import re
+10 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+11 
+12 from gpiozero import OutputDevice
+13 
+14 PORT = 8000
+15 ALLOWED = set(range(2, 28))  # GPIO2~27 (GPIO0·1은 HAT 정보용 핀이라 제외)
+16 pins = {}                    # 한 번이라도 쓴 핀: {번호: OutputDevice}
+17 
+18 
+19 def device(pin):
+20     if pin not in pins:
+21         pins[pin] = OutputDevice(pin, initial_value=False)
+22     return pins[pin]
+23 
+24 
+25 class Handler(BaseHTTPRequestHandler):
+26     def do_GET(self):
+27         path = self.path.split('?')[0].rstrip('/')
+28         m = re.fullmatch(r'/gpio/(\d+)/(on|off|toggle)', path)
+29         if m:
+30             pin, action = int(m.group(1)), m.group(2)
+31             if pin not in ALLOWED:
+32                 return self.reply(400, {'error': f'GPIO{pin}는 사용할 수 없어요 (2~27만 가능)'})
+33             dev = device(pin)
+34             if action == 'on':
+35                 dev.on()
+36             elif action == 'off':
+37                 dev.off()
+38             else:
+39                 dev.toggle()
+40             print(f'GPIO{pin} → {"ON" if dev.value else "OFF"}', flush=True)
+41             return self.reply(200, {'pin': pin, 'on': bool(dev.value)})
+42         if path == '/gpio/all/off':
+43             for dev in pins.values():
+44                 dev.off()
+45             print('모든 GPIO → OFF', flush=True)
+46             return self.reply(200, {'all': 'off'})
+47         if path == '/gpio':
+48             return self.reply(200, {str(p): bool(d.value) for p, d in sorted(pins.items())})
+49         self.reply(404, {'error': 'not found'})
+50 
+51     def reply(self, code, data):
+52         body = json.dumps(data, ensure_ascii=False).encode()
+53         self.send_response(code)
+54         self.send_header('Content-Type', 'application/json; charset=utf-8')
+55         self.send_header('Content-Length', str(len(body)))
+56         self.end_headers()
+57         self.wfile.write(body)
+58 
+59     def log_message(self, *args):  # 접속 기록은 생략 (GPIO 변경만 출력)
+60         pass
+61 
+62 
+63 if __name__ == '__main__':
+64     print(f'GPIO 서버 시작: 포트 {PORT}', flush=True)
+65     ThreadingHTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
+```
+
+| 줄 | 설명 |
+|-----|-----|
+| 1 | 셔뱅. 이 파일을 `python3`로 실행하라는 표시 (`/usr/bin/env`가 python3 위치를 찾아 줌) |
+| 2~6 | 주석. 무슨 프로그램인지, 어떤 주소로 부르는지 |
+| 8 | `import json`: 결과를 `{"pin": 17, "on": true}` 같은 JSON 글자로 만드는 도구 |
+| 9 | `import re`: 정규식(글자 패턴 찾기) 도구. 주소에서 핀 번호·명령을 뽑을 때 사용 |
+| 10 | 파이썬에 기본으로 들어 있는 **웹 서버** 도구 (추가 설치 불필요). `ThreadingHTTPServer` = 여러 요청을 동시에 처리 |
+| 12 | `gpiozero`의 `OutputDevice`: GPIO 핀을 **출력용**(켜기/끄기)으로 쓰는 도구. Raspberry Pi OS 기본 포함, 파이 5 지원 |
+| 14 | `PORT = 8000`: 서버가 받을 포트 번호. 주소 뒤의 `:8000` |
+| 15 | `ALLOWED`: 제어를 허용할 GPIO 번호 2~27. `range(2, 28)` = 2부터 27까지. GPIO0·1은 HAT 정보용이라 제외 |
+| 16 | `pins = {}`: 한 번이라도 쓴 핀을 기억하는 사전(번호 → 핀 객체) |
+| 19~22 | `device(pin)`: 처음 쓰는 핀이면 `OutputDevice(pin, initial_value=False)`로 **꺼진 상태로** 준비해서 저장, 이미 있으면 그걸 돌려줌 |
+| 25 | `class Handler`: 요청이 올 때마다 무엇을 할지 정하는 부분 |
+| 26 | `do_GET`: 주소를 여는 요청(GET)이 오면 실행. 단축어의 "URL 콘텐츠 가져오기"가 GET 요청 |
+| 27 | 주소에서 `?` 뒤를 버리고, 끝의 `/`도 지움 → 예: `/gpio/17/on` |
+| 28 | 주소가 `/gpio/숫자/on·off·toggle` 형태인지 검사. `(\d+)` = 숫자 부분, `(on\|off\|toggle)` = 명령 부분 |
+| 29~30 | 형태가 맞으면 숫자를 핀 번호(`int`), 명령을 `action`에 저장 |
+| 31~32 | 허용 범위(2~27)가 아니면 400(잘못된 요청)과 오류 메시지를 돌려주고 끝 |
+| 33 | 그 핀의 객체 가져오기 (19~22줄) |
+| 34~39 | 명령대로 `on()` 켜기 / `off()` 끄기 / `toggle()` 반대로 |
+| 40 | 서버 로그에 `GPIO17 → ON` 같은 줄 출력 (`journalctl -u gpio-server`로 봄). `flush=True` = 바로 기록 |
+| 41 | 200(성공)과 `{"pin": 17, "on": true}` 를 돌려줌 |
+| 42~46 | 주소가 `/gpio/all/off`면 쓴 핀을 전부 끄고 `{"all": "off"}` (웹앱의 "켜진 GPIO 모두 끄기") |
+| 47~48 | 주소가 `/gpio`면 지금까지 쓴 핀들의 상태를 돌려줌 (예: `{"17": true}`) |
+| 49 | 그 외 주소는 404(없음) |
+| 51~57 | `reply`: 결과를 JSON 글자로 바꿔(`ensure_ascii=False` = 한글 그대로) 상태 코드·헤더와 함께 보내는 공통 함수 |
+| 59~60 | 접속할 때마다 찍히는 기본 기록은 끔 (로그에는 GPIO 변경만 남김) |
+| 63 | 이 파일을 직접 실행했을 때만 아래를 실행 (파이썬 관례) |
+| 64 | 시작 메시지 출력 |
+| 65 | `0.0.0.0` = 파이의 **모든 네트워크(핫스팟·iptime)** 에서 8000번 포트로 요청을 받고, `serve_forever()` = 끄기 전까지 계속 대기 |
+
+<br><br><br>
+
+## 5. `gpio-server.service` (GPIO 서버 자동 실행)
+
+```ini
+1  [Unit]
+2  Description=GPIO control server for the iPhone web app
+3  After=network.target
+4  
+5  [Service]
+6  ExecStart=/usr/bin/python3 /usr/local/bin/gpio-server.py
+7  Restart=always
+8  RestartSec=3
+9  
+10 [Install]
+11 WantedBy=multi-user.target
+```
+
+| 줄 | 설명 |
+|-----|-----|
+| 1 | `[Unit]`: 기본 정보 구역 |
+| 2 | `Description=`: 서비스 설명 (`systemctl status gpio-server`에 표시) |
+| 3 | `After=network.target`: 네트워크가 준비된 뒤에 시작 |
+| 5 | `[Service]`: 실행 방법 구역 |
+| 6 | `ExecStart=`: 실행할 명령. `python3`로 `/usr/local/bin/gpio-server.py` 실행. `User=`가 없으니 관리자(root) 권한으로 실행 → GPIO 접근 권한 문제 없음 |
+| 7 | `Restart=always`: 서버가 어떤 이유로든 꺼지면 **자동으로 다시 켬** |
+| 8 | `RestartSec=3`: 다시 켜기 전 3초 기다림 |
+| 10 | `[Install]`: `enable` 할 때 쓰는 구역 |
+| 11 | `WantedBy=multi-user.target`: `enable` 하면 **부팅 때마다 자동 시작** (`multi-user.target` = 부팅이 거의 끝난 일반 동작 단계) |
+
+핫스팟용 `.service`(한 번 실행하고 끝, `Type=oneshot` + timer)와 달리, 이 서버는 **계속 켜져서 요청을 기다려야** 하므로 timer 없이 `Restart=always`로 항상 켜 둠.
+
+<br><br><br>
+
 ## 수정한 뒤에는
 `/etc/systemd/system/`의 `.service`나 `.timer`를 고쳤다면:
 ```bash
 sudo systemctl daemon-reload                     # 바뀐 설정 다시 읽기
-sudo systemctl restart hotspot-priority.timer    # 타이머 다시 시작
+sudo systemctl restart hotspot-priority.timer    # 핫스팟 타이머 다시 시작
+sudo systemctl restart gpio-server               # GPIO 서버 다시 시작
 ```
-`/usr/local/bin/hotspot-priority.sh`를 고쳤다면 다음 실행(30초 이내)부터 바로 반영.
+- `/usr/local/bin/hotspot-priority.sh`를 고쳤다면 다음 실행(30초 이내)부터 바로 반영
+- `/usr/local/bin/gpio-server.py`를 고쳤다면 `sudo systemctl restart gpio-server` 필요 (계속 켜져 있는 프로그램이라 다시 시작해야 반영)
+- GitHub에서 새 버전을 받았다면: `cd ~/RaspberryPi && git pull` 후 위 설치 명령의 `sudo cp ...`를 다시 실행하고 restart
