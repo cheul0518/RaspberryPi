@@ -60,7 +60,7 @@
   .lab.gpio.on::after { content:' ON'; font-weight:800; margin-left:4px; }
   .lab.left.gpio.on::after { content:''; }
   .lab.left.gpio.on::before { content:'ON '; font-weight:800; margin-right:4px; }
-  .lab .sub { font-weight:500; opacity:.75; margin:0 3px; }
+  .lab .sub { font-weight:500; opacity:.75; margin:0 3px; white-space:nowrap; }
   .num { width:28px; height:32px; display:flex; align-items:center; justify-content:center; font-size:11px;
          font-weight:700; border-radius:50%; color:#fff; align-self:center; height:28px; }
   .num.v3 { background:var(--v3); } .num.v5 { background:var(--v5); } .num.gnd { background:var(--gnd); }
@@ -167,27 +167,27 @@ btn.addEventListener('click', () => {
 // ───────── 2번 탭: GPIO ─────────
 // 라즈베리 파이 5의 40핀 헤더. [핀 번호, 종류, 이름, GPIO 번호]
 // 종류: v3 = 3.3V 전원, v5 = 5V 전원, gnd = 접지, gpio = 제어 가능한 핀, id = HAT 정보용(제어 안 함)
-const PINS = [
-  [1,'v3','3V3'],            [2,'v5','5V'],
-  [3,'gpio','GPIO2','SDA',2],   [4,'v5','5V'],
-  [5,'gpio','GPIO3','SCL',3],   [6,'gnd','GND'],
-  [7,'gpio','GPIO4','',4],      [8,'gpio','GPIO14','TXD',14],
-  [9,'gnd','GND'],           [10,'gpio','GPIO15','RXD',15],
-  [11,'gpio','GPIO17','',17],   [12,'gpio','GPIO18','PCM',18],
-  [13,'gpio','GPIO27','',27],   [14,'gnd','GND'],
-  [15,'gpio','GPIO22','',22],   [16,'gpio','GPIO23','',23],
-  [17,'v3','3V3'],           [18,'gpio','GPIO24','',24],
-  [19,'gpio','GPIO10','MOSI',10],[20,'gnd','GND'],
-  [21,'gpio','GPIO9','MISO',9], [22,'gpio','GPIO25','',25],
-  [23,'gpio','GPIO11','SCLK',11],[24,'gpio','GPIO8','CE0',8],
-  [25,'gnd','GND'],          [26,'gpio','GPIO7','CE1',7],
-  [27,'id','ID_SD'],         [28,'id','ID_SC'],
-  [29,'gpio','GPIO5','',5],     [30,'gnd','GND'],
-  [31,'gpio','GPIO6','',6],     [32,'gpio','GPIO12','PWM0',12],
-  [33,'gpio','GPIO13','PWM1',13],[34,'gnd','GND'],
-  [35,'gpio','GPIO19','',19],   [36,'gpio','GPIO16','',16],
-  [37,'gpio','GPIO26','',26],   [38,'gpio','GPIO20','',20],
-  [39,'gnd','GND'],          [40,'gpio','GPIO21','',21],
+const PINS = [   // 보조 기능은 대표 1개만 표시 (핀 하나에 기능이 여러 개라 문서마다 다르게 적기도 함. 예: GPIO18 = SPI1 CE0 / PCM CLK / PWM)
+  [1,'v3','3V3'],                  [2,'v5','5V'],
+  [3,'gpio','GPIO2','SDA',2],         [4,'v5','5V'],
+  [5,'gpio','GPIO3','SCL',3],         [6,'gnd','GND'],
+  [7,'gpio','GPIO4','GPCLK0',4],      [8,'gpio','GPIO14','TXD',14],
+  [9,'gnd','GND'],                 [10,'gpio','GPIO15','RXD',15],
+  [11,'gpio','GPIO17','SPI1 CE1',17], [12,'gpio','GPIO18','SPI1 CE0',18],
+  [13,'gpio','GPIO27','',27],         [14,'gnd','GND'],
+  [15,'gpio','GPIO22','',22],         [16,'gpio','GPIO23','',23],
+  [17,'v3','3V3'],                 [18,'gpio','GPIO24','',24],
+  [19,'gpio','GPIO10','SPI0 MOSI',10],[20,'gnd','GND'],
+  [21,'gpio','GPIO9','SPI0 MISO',9],  [22,'gpio','GPIO25','',25],
+  [23,'gpio','GPIO11','SPI0 SCLK',11],[24,'gpio','GPIO8','SPI0 CE0',8],
+  [25,'gnd','GND'],                [26,'gpio','GPIO7','SPI0 CE1',7],
+  [27,'id','ID_SD'],               [28,'id','ID_SC'],
+  [29,'gpio','GPIO5','',5],           [30,'gnd','GND'],
+  [31,'gpio','GPIO6','',6],           [32,'gpio','GPIO12','PWM',12],
+  [33,'gpio','GPIO13','PWM',13],      [34,'gnd','GND'],
+  [35,'gpio','GPIO19','SPI1 MISO',19],[36,'gpio','GPIO16','SPI1 CE2',16],
+  [37,'gpio','GPIO26','',26],         [38,'gpio','GPIO20','SPI1 MOSI',20],
+  [39,'gnd','GND'],                [40,'gpio','GPIO21','SPI1 SCLK',21],
 ];
 
 const hostInput = document.getElementById('hostInput');
