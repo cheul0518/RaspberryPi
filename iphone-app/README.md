@@ -165,8 +165,8 @@ journalctl -u hotspot-priority -n 20
 
 ### 구조
 ```
-[웹앱 2번 탭] --GPIO 누름--> [단축어: GPIO 제어] --http://raspberrypi.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
-                                     └── 끝나면 webapp:// 로 웹앱 2번 탭에 자동 복귀
+[웹앱 2번 탭] --GPIO17 누름--> [단축어: GPIO 제어] --http://raspberrypi.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
+                                       └── 끝나면 webapp:// 로 웹앱 2번 탭에 자동 복귀
 ```
 - 왜 단축어를 거칠까? 웹앱은 `https://`(GitHub Pages)인데 파이는 `http://`라서, 보안 규칙(혼합 콘텐츠 차단) 때문에 **웹페이지가 파이에 직접 요청할 수 없음**. 단축어는 이 제한이 없어서 대신 요청을 보냄
 - 그래서 GPIO를 누를 때도 핫스팟 버튼처럼 단축어 화면이 잠깐 보였다가 돌아옴
