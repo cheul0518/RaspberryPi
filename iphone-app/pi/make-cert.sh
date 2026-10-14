@@ -15,7 +15,9 @@ if [ ! -f ca.key ]; then                 # 인증 기관은 처음 한 번만 �
     openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
         -keyout ca.key -out ca.crt -subj "/CN=$NAME GPIO CA" \
         -addext "basicConstraints=critical,CA:TRUE" \
-        -addext "keyUsage=critical,keyCertSign,cRLSign"
+        -addext "keyUsage=critical,keyCertSign,cRLSign" \
+        -addext "nameConstraints=critical,permitted;DNS:$NAME.local"
+        # ↑ 이 인증 기관은 user-root.local 주소에만 쓸 수 있게 제한 (키가 새도 다른 사이트를 흉내 낼 수 없음)
 fi
 
 openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj "/CN=$NAME.local"

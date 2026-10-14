@@ -116,6 +116,7 @@ from gpiozero import OutputDevice    # GPIO 핀을 출력용(켜기/끄기)으�
 HTTP_PORT = 8000                     # http 포트: 인증서 받기(/ca.crt)·테스트용
 HTTPS_PORT = 8443                    # https 포트: 웹앱이 쓰는 주소 = user-root.local:8443
 CERT_DIR = '/etc/gpio-server'        # make-cert.sh 가 인증서를 만드는 폴더
+WEBAPP = 'https://cheul0518.github.io'   # 이 주소의 웹앱만 GPIO를 조작할 수 있음
 ALLOWED = set(range(2, 28))          # 제어 허용 GPIO 2~27 (range(2, 28) = 2부터 27까지). GPIO0·1은 HAT 정보용이라 제외
 pins = {}                            # 이 서버가 켜고 끈 핀을 기억하는 사전 {번호: 핀}
 lock = threading.Lock()              # 두 요청이 동시에 같은 핀을 건드리지 않게 하는 자물쇠
@@ -148,6 +149,16 @@ def read_all():                      # GPIO2~27 의 실제 상태를 읽는 함�
 
 
 class Handler(BaseHTTPRequestHandler):   # 요청이 올 때마다 무엇을 할지 정하는 부분
+    def do_OPTIONS(self):            # 브라우저의 사전 확인 ("X-GPIO 표시를 붙여 보내도 돼?")
+        if self.headers.get('Origin') != WEBAPP:   # 요청한 웹사이트가 우리 웹앱이 아니면
+            return self.reply(403, {'error': '허용되지 않은 웹사이트'})   # 거절 → 브라우저가 본 요청을 아예 안 보냄
+        self.send_response(204)      # 204 = 허락 (내용 없음)
+        self.send_header('Access-Control-Allow-Origin', WEBAPP)   # 우리 웹앱에만
+        self.send_header('Access-Control-Allow-Headers', 'X-GPIO')   # X-GPIO 표시를 붙여도 된다고 허락
+        self.send_header('Access-Control-Allow-Private-Network', 'true')   # 크롬 계열 브라우저용 (사설 네트워크 접속 허락)
+        self.send_header('Access-Control-Max-Age', '600')   # 이 허락을 600초 동안 기억
+        self.end_headers()
+
     def do_GET(self):                # 주소를 여는 요청(GET)이 오면 실행
         path = self.path.split('?')[0].rstrip('/')    # 주소에서 ? 뒤와 끝의 / 를 지움 → 예: /gpio/17/on
         if path == '/ca.crt':        # 아이폰이 인증서를 받으러 오면
@@ -160,6 +171,11 @@ class Handler(BaseHTTPRequestHandler):   # 요청이 올 때마다 무엇을 할
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if path.startswith('/gpio/') and self.headers.get('X-GPIO') != '1':
+            return self.reply(403, {'error': 'X-GPIO 머리말 없음'})
+                                     # ↑ 켜고 끄는 요청에 X-GPIO 표시가 없으면 거절
+                                     #   브라우저는 위 do_OPTIONS 허락을 받은 웹사이트(우리 웹앱)만 이 표시를 붙일 수 있음
+                                     #   → 다른 웹사이트가 내 아이폰을 이용해 몰래 켜고 끄는 것을 막음
         m = re.fullmatch(r'/gpio/(\d+)/(on|off|toggle)', path)
                                      # ↑ 주소가 /gpio/숫자/on·off·toggle 모양인지 검사
         if m:                        # 모양이 맞으면
@@ -191,8 +207,8 @@ class Handler(BaseHTTPRequestHandler):   # 요청이 올 때마다 무엇을 할
         self.send_response(code)     # 상태 코드 (200 성공 / 400 잘못된 요청 / 404 없음 / 409 충돌)
         self.send_header('Content-Type', 'application/json; charset=utf-8')   # "내용은 JSON"이라고 알림
         self.send_header('Content-Length', str(len(body)))   # 내용 길이
-        self.send_header('Access-Control-Allow-Origin', '*')
-                                     # ↑ 다른 주소(GitHub 웹앱)에서 온 요청도 결과를 읽을 수 있게 허용. 없으면 웹앱이 답을 못 읽음
+        self.send_header('Access-Control-Allow-Origin', WEBAPP)
+                                     # ↑ 우리 웹앱(GitHub 주소)만 결과를 읽을 수 있게 허용. 없으면 웹앱이 답을 못 읽음
         self.send_header('Cache-Control', 'no-store')   # 저장해 둔 옛날 답 말고 항상 새로 받게 함
         self.end_headers()           # 머리말 끝
         self.wfile.write(body)       # 내용 보내기
@@ -263,10 +279,13 @@ if [ ! -f ca.key ]; then             # ca.key 파일이 없을 때만 (= 처음 
     openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
         -keyout ca.key -out ca.crt -subj "/CN=$NAME GPIO CA" \
         -addext "basicConstraints=critical,CA:TRUE" \
-        -addext "keyUsage=critical,keyCertSign,cRLSign"
+        -addext "keyUsage=critical,keyCertSign,cRLSign" \
+        -addext "nameConstraints=critical,permitted;DNS:$NAME.local"
                                      # ↑ 직접 만든 "인증 기관"(ca.crt + 비밀 키 ca.key). 10년(3650일) 유효
                                      #   이름 = "user-root GPIO CA" (아이폰 설정에 이 이름으로 보임)
                                      #   CA:TRUE = 다른 인증서에 서명할 수 있는 인증서라는 뜻
+                                     #   nameConstraints = user-root.local 주소에만 쓸 수 있게 제한
+                                     #   (키가 새도 은행·포털 같은 다른 사이트를 흉내 낼 수 없음)
                                      #   다시 만들면 아이폰에 다시 설치해야 해서 한 번만 만듦
 fi
 

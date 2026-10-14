@@ -204,13 +204,14 @@ journalctl -u gpio-server -n 5
 # ↑ 정상: "GPIO 서버 시작: 포트 8000" 과 "https 시작: 포트 8443" 두 줄이 보임
 #   "https 꺼짐: 인증서가 없어요" 가 보이면 2) 를 다시 실행 후 restart
 
-curl -k https://localhost:8443/gpio/17/on
+curl -k -H "X-GPIO: 1" https://localhost:8443/gpio/17/on
 # ↑ 정상: {"pin": 17, "on": true}   (GPIO17에 LED를 연결했다면 켜짐)
 #   -k = 이 테스트에서는 인증서 확인을 건너뜀 (파이 안에서 시험할 때만)
+#   -H "X-GPIO: 1" = 켜고 끄는 요청에 꼭 붙이는 표시 (없으면 {"error": "X-GPIO 머리말 없음"})
 curl -k https://localhost:8443/gpio
 # ↑ 정상: {"2": {"mode": "ip", "on": false}, ... "17": {"mode": "op", "on": true}, ...}
 #   mode: op = 출력, ip = 입력, no = 안 씀, a0~a8 = 다른 기능(I2C·SPI 등)
-curl -k https://localhost:8443/gpio/17/off
+curl -k -H "X-GPIO: 1" https://localhost:8443/gpio/17/off
 # ↑ 정상: {"pin": 17, "on": false}
 
 hostname
@@ -241,7 +242,11 @@ GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 �
 - 화면의 ON은 파이에서 2초마다 읽어 온 **실제 상태**. 점선 테두리 = 그 핀을 입력이나 다른 기능(I2C·SPI 등)으로 쓰는 중
 - "켜진 GPIO 모두 끄기"는 **이 서버로 켠 핀**만 끔 (다른 프로그램이 켠 핀은 그 프로그램에서 끄기)
 - GPIO는 **3.3V, 약한 전류**만 출력. 모터·릴레이 등은 직접 연결하지 말고 트랜지스터/드라이버 모듈을 거칠 것
-- 같은 iptime Wi-Fi에 있는 다른 사람도 이 주소를 알면 GPIO를 켤 수 있음 (핫스팟에서는 내 폰만 접속)
+- **보안**
+  - 밖(인터넷)에서는 파이에 접속할 수 없음 (공유기 포트포워딩을 안 했으므로)
+  - 핫스팟을 쓰면 핫스팟 비밀번호를 아는 기기만 같은 네트워크에 들어옴. 같은 iptime Wi-Fi에서는 그 Wi-Fi에 접속한 사람이 직접 명령어로 GPIO를 켤 수는 있음 (비밀번호 없음)
+  - 다른 웹사이트가 내 아이폰 브라우저를 이용해 몰래 켜고 끄는 것은 막혀 있음: 서버가 `https://cheul0518.github.io` 웹앱의 요청만 받음
+  - 아이폰에 설치한 인증서는 `user-root.local` 주소에만 쓸 수 있게 제한돼 있어서, 파이의 키가 새더라도 은행·포털 같은 다른 사이트를 흉내 내는 데 쓸 수 없음
 - 서버 끄기: `sudo systemctl disable --now gpio-server`
 - 파일 한 줄씩 설명: [pi/README.md](./pi/README.md)
 

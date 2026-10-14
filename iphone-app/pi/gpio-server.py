@@ -18,6 +18,7 @@ from gpiozero import OutputDevice
 HTTP_PORT = 8000                     # 인증서 받기·테스트용 (http)
 HTTPS_PORT = 8443                    # 웹앱용 (https)
 CERT_DIR = '/etc/gpio-server'        # make-cert.sh 가 인증서를 만드는 곳
+WEBAPP = 'https://cheul0518.github.io'   # 이 주소의 웹앱만 GPIO를 조작할 수 있음
 ALLOWED = set(range(2, 28))          # GPIO2~27 (GPIO0·1은 HAT 정보용 핀이라 제외)
 pins = {}                            # 이 서버가 켜고 끈 핀: {번호: OutputDevice}
 lock = threading.Lock()
@@ -48,6 +49,17 @@ def read_all():
 
 
 class Handler(BaseHTTPRequestHandler):
+    def do_OPTIONS(self):
+        # 브라우저의 사전 확인: "X-GPIO 머리말을 붙여 보내도 돼?" → 우리 웹앱 주소에만 허락
+        if self.headers.get('Origin') != WEBAPP:
+            return self.reply(403, {'error': '허용되지 않은 웹사이트'})
+        self.send_response(204)
+        self.send_header('Access-Control-Allow-Origin', WEBAPP)
+        self.send_header('Access-Control-Allow-Headers', 'X-GPIO')
+        self.send_header('Access-Control-Allow-Private-Network', 'true')   # 크롬 계열 브라우저용 (사설 네트워크 접속 허락)
+        self.send_header('Access-Control-Max-Age', '600')
+        self.end_headers()
+
     def do_GET(self):
         path = self.path.split('?')[0].rstrip('/')
         if path == '/ca.crt':        # 아이폰에 설치할 인증서 파일
@@ -60,6 +72,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if path.startswith('/gpio/') and self.headers.get('X-GPIO') != '1':
+            # 다른 웹사이트가 몰래 켜고 끄는 것 방지: 브라우저는 우리 웹앱에서만 이 머리말을 붙일 수 있음
+            return self.reply(403, {'error': 'X-GPIO 머리말 없음'})
         m = re.fullmatch(r'/gpio/(\d+)/(on|off|toggle)', path)
         if m:
             pin, action = int(m.group(1)), m.group(2)
@@ -89,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Content-Length', str(len(body)))
-        self.send_header('Access-Control-Allow-Origin', '*')   # GitHub 웹앱(다른 주소)이 결과를 읽을 수 있게 허용
+        self.send_header('Access-Control-Allow-Origin', WEBAPP)   # 우리 웹앱만 결과를 읽을 수 있게 허용
         self.send_header('Cache-Control', 'no-store')          # 항상 최신 상태
         self.end_headers()
         self.wfile.write(body)
