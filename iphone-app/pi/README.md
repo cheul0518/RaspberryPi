@@ -13,7 +13,9 @@
 | `gpio-server.service` | GPIO 서버를 **부팅 때 켜고 계속 켜 두는** systemd 설정 | `/etc/systemd/system/` |
 | `make-cert.sh` | 웹앱이 `https`로 접속할 수 있게 **인증서를 만드는** 스크립트 (처음 한 번 실행) | 복사 안 함, 결과는 `/etc/gpio-server/` |
 
-동작 순서: 부팅 → **timer**가 30초마다 → **service**를 실행 → service가 **sh 스크립트**를 실행 → 핫스팟이 보이면 전환
+동작 순서
+- 핫스팟: 부팅 → **timer**가 30초마다 → **service**를 실행 → service가 **sh 스크립트**를 실행 → 핫스팟이 보이면 전환
+- GPIO: 부팅 → **gpio-server.service**가 **gpio-server.py**를 켜 둠 → 웹앱이 https(8443)로 켜기·끄기·상태 요청 → 서버가 GPIO를 바꾸고 결과를 돌려줌
 
 - `systemd`: 라즈베리 파이 OS에서 프로그램을 자동으로 켜고 끄고 반복 실행해 주는 관리자
 - `.service` / `.timer`는 프로그램이 아니라 systemd가 읽는 **설정 파일**. 같은 이름(`hotspot-priority`)끼리 짝이 됨

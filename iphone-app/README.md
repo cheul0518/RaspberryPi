@@ -249,6 +249,7 @@ GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 �
   - 핫스팟을 쓰면 핫스팟 비밀번호를 아는 기기만 같은 네트워크에 들어옴. 같은 iptime Wi-Fi에서는 그 Wi-Fi에 접속한 사람이 직접 명령어로 GPIO를 켤 수는 있음 (비밀번호 없음)
   - 다른 웹사이트가 내 아이폰 브라우저를 이용해 몰래 켜고 끄는 것은 막혀 있음: 서버가 `https://cheul0518.github.io` 웹앱의 요청만 받음
   - 아이폰에 설치한 인증서는 `user-root.local` 주소에만 쓸 수 있게 제한돼 있어서, 파이의 키가 새더라도 은행·포털 같은 다른 사이트를 흉내 내는 데 쓸 수 없음
+- 인증서 기간: 파이 서버 인증서는 825일(약 2년 3개월) 유효. 지나면 파이에서 `sudo bash make-cert.sh` → `sudo systemctl restart gpio-server` (아이폰은 다시 설치 안 해도 됨)
 - 서버 끄기: `sudo systemctl disable --now gpio-server`
 - 파일 한 줄씩 설명: [pi/README.md](./pi/README.md)
 
@@ -258,7 +259,6 @@ GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 �
 ```js
 const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
-// 2번 탭(GPIO)은 단축어 없이 fetch('https://user-root.local:8443/gpio/17/on') 로 파이에 직접 요청
 
 // 버튼을 누르면: 화면을 먼저 ON/OFF로 바꾸고 단축어 실행
 const back = encodeURIComponent('webapp://' + location.host + location.pathname);  // 홈 화면 웹앱 주소
@@ -271,6 +271,14 @@ location.href = url;
 - `webapp://`은 경로·파라미터를 무시하고 앱만 열어서, 상태는 단축어 실행 **전에** 저장. 일부 iOS 버전에서는 "주소가 유효하지 않음" 오류가 난다는 보고도 있음 → 그때는 **◀** 로 복귀
 - 공백은 반드시 `%20`으로 인코딩 (`URLSearchParams`는 공백을 `+`로 바꿔 단축어 이름이 안 맞음)
 - 눌린 버튼 효과: CSS에서 `transform: scale(.92)` + 안쪽 그림자(`inset box-shadow`)
+
+```js
+// 2번 탭(GPIO): 단축어 없이 파이에 직접 요청
+fetch('https://user-root.local:8443/gpio/17/on', { headers: { 'X-GPIO': '1' } });   // 켜기
+setInterval(() => fetch('https://user-root.local:8443/gpio', ...), 2000);           // 2초마다 실제 상태 읽기
+```
+- `X-GPIO` 표시: 파이 서버는 이 표시가 붙은 요청만 받음. 브라우저는 서버가 허락한 웹사이트(`cheul0518.github.io`)에서만 이 표시를 붙여 보낼 수 있음
+- 4초 안에 답이 없으면 실패로 보고 화면 위에 빨강 "연결 안 됨" 표시
 
 <br><br><br>
 

@@ -87,7 +87,7 @@
 
 ## 아이폰 연동
 - [핫스팟 (파트 1)](../iphone-app/README.md): 버튼 1개 웹앱으로 아이폰 개인용 핫스팟 켜기/끄기 ([웹앱 열기](https://cheul0518.github.io/RaspberryPi/iphone-app/))
-- [GPIO 탭 (파트 2)](../iphone-app/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃): 웹앱에서 라즈베리 파이 5 핀아웃을 보고 GPIO ON/OFF
+- [GPIO 탭 (파트 2)](../iphone-app/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃): 웹앱에서 라즈베리 파이 5 핀 배치를 보고 GPIO ON/OFF, 실제 핀 상태 실시간 표시 (단축어 없음)
 
 <br><br><br>
 
