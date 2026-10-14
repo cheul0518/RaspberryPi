@@ -68,6 +68,10 @@
   #host { margin-top:14px; width:100%; max-width:380px; font-size:13px; color:var(--muted); }
   #host input { width:100%; margin-top:4px; padding:10px; font-size:15px; border-radius:10px;
                 border:1px solid var(--line); background:var(--card); color:var(--text); }
+  .lab.gpio.busy { border-style:dashed; opacity:.55; }
+  #conn { margin:0 0 10px; font-size:13px; font-weight:600; color:var(--muted); text-align:center; }
+  #conn.ok { color:var(--on); } #conn.bad { color:var(--v5); }
+  #certlink { display:block; margin-top:8px; font-size:13px; color:var(--gpio); }
   #alloff { margin-top:12px; padding:10px 18px; border-radius:10px; border:none; background:var(--card);
             color:var(--v5); font-weight:600; font-size:15px; }
 
@@ -91,11 +95,13 @@
 <!-- 2번 탭: 라즈베리 파이 5 핀아웃 + GPIO ON/OFF -->
 <section class="page" id="p2">
   <h2>Raspberry Pi 5 핀아웃</h2>
-  <p class="hint">파란 테두리 GPIO를 누르면 ON/OFF · 1번 핀 = USB·LAN 포트 반대쪽 끝</p>
+  <p class="hint">파란 테두리 GPIO를 누르면 ON/OFF · 1번 핀 = USB·LAN 포트 반대쪽 끝<br>점선 = 입력·다른 기능으로 쓰는 중</p>
+  <p id="conn">연결 확인 중…</p>
   <div id="header"></div>
   <button id="alloff">켜진 GPIO 모두 끄기</button>
   <label id="host">파이 주소 (보통 그대로 두면 됨)
     <input id="hostInput" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <a id="certlink" target="_blank">처음 한 번: 아이폰에 인증서 설치하기</a>
   </label>
 </section>
 
@@ -125,7 +131,6 @@
 // 아이폰 단축어를 실행해서 처리합니다. 단축어 이름이 아래와 정확히 같아야 합니다.
 const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
-const SHORTCUT_GPIO = 'GPIO 제어';
 
 function load(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } }
 function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
@@ -146,6 +151,7 @@ function showTab(n) {
   document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'p' + n));
   document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('active', b.dataset.tab === String(n)));
   save('tab', n);   // 단축어 다녀와도 같은 탭으로 돌아오도록 저장
+  if (window.gpioReady) refreshGpio();   // GPIO 탭을 열면 바로 실제 상태 읽기
 }
 document.querySelectorAll('#tabbar button').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
 showTab(load('tab', 1));
@@ -190,12 +196,21 @@ const PINS = [   // 보조 기능은 대표 1개만 표시 (핀 하나에 기능
   [39,'gnd','GND'],                [40,'gpio','GPIO21','SPI1 SCLK',21],
 ];
 
+// 파이 주소: 웹앱이 https 로 파이에 직접 연결 (단축어 없음)
+const DEFAULT_HOST = 'user-root.local:8443';
 const hostInput = document.getElementById('hostInput');
-hostInput.value = load('piHost', 'user-root.local:8000');
-hostInput.addEventListener('change', () => save('piHost', hostInput.value.trim() || 'user-root.local:8000'));
+const certLink = document.getElementById('certlink');
+let piHost = String(load('piHost', DEFAULT_HOST)).replace(/:8000$/, ':8443');   // 예전 주소(:8000)는 :8443으로
+function setHost(h) {
+  piHost = h || DEFAULT_HOST; save('piHost', piHost); hostInput.value = piHost;
+  certLink.href = 'http://' + piHost.replace(/:\d+$/, '') + ':8000/ca.crt';   // 인증서는 http 8000번에서 받음
+}
+setHost(piHost);
+hostInput.addEventListener('change', () => { setHost(hostInput.value.trim()); refreshGpio(); });
 
-let gpioOn = load('gpioOn', {});   // { "17": true, ... }  마지막으로 누른 상태 기억
+let gpioState = {};                // 파이가 알려 준 실제 상태 { "17": {mode:"op", on:true}, ... }
 const header = document.getElementById('header');
+const conn = document.getElementById('conn');
 
 function labelEl([pin, kind, name, sub, gpio], side) {
   const el = document.createElement('div');
@@ -220,20 +235,56 @@ for (let i = 0; i < PINS.length; i += 2) {   // 한 줄 = 왼쪽(홀수 핀) + �
 }
 
 function renderGpio() {
-  header.querySelectorAll('.lab.gpio').forEach(el => el.classList.toggle('on', !!gpioOn[el.dataset.gpio]));
-}
-renderGpio();
-
-function toggleGpio(gpio) {
-  const next = !gpioOn[gpio];
-  gpioOn[gpio] = next; save('gpioOn', gpioOn); renderGpio();
-  // 단축어 "GPIO 제어"가 http:// + 이 텍스트 주소를 열어 파이 서버에 명령을 보냄
-  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'user-root.local:8000')}/gpio/${gpio}/${next ? 'on' : 'off'}`);
+  header.querySelectorAll('.lab.gpio').forEach(el => {
+    const st = gpioState[el.dataset.gpio] || {};
+    el.classList.toggle('on', !!st.on);
+    el.classList.toggle('busy', st.mode === 'ip' || /^a\d/.test(st.mode || ''));   // 입력·다른 기능(I2C·SPI 등)
+  });
 }
 
-document.getElementById('alloff').addEventListener('click', () => {
-  gpioOn = {}; save('gpioOn', gpioOn); renderGpio();
-  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'user-root.local:8000')}/gpio/all/off`);
+function setConn(ok, text) { conn.className = ok ? 'ok' : 'bad'; conn.textContent = text; }
+
+async function api(path) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 4000);   // 4초 안에 답이 없으면 실패
+  try {
+    const r = await fetch(`https://${piHost}${path}`, { cache: 'no-store', signal: ctrl.signal });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || r.status);
+    return data;
+  } finally { clearTimeout(t); }
+}
+
+async function refreshGpio() {
+  if (load('tab', 1) != 2 || document.hidden) return;   // GPIO 탭을 보고 있을 때만
+  try {
+    gpioState = await api('/gpio');
+    setConn(true, '● 파이 연결됨 · 실제 상태 표시 중');
+  } catch (e) {
+    setConn(false, '파이에 연결 안 됨 · 핫스팟 연결과 인증서 설치를 확인하세요');
+  }
+  renderGpio();
+}
+setInterval(refreshGpio, 2000);                        // 2초마다 실제 상태 다시 읽기
+document.addEventListener('visibilitychange', refreshGpio);
+window.gpioReady = true;
+refreshGpio();
+
+async function toggleGpio(gpio) {
+  const next = !(gpioState[gpio] || {}).on;
+  try {
+    const r = await api(`/gpio/${gpio}/${next ? 'on' : 'off'}`);
+    gpioState[gpio] = { mode: 'op', on: r.on };
+    renderGpio();
+  } catch (e) {
+    setConn(false, `GPIO${gpio} 실패: ${e.name === 'AbortError' ? '응답 없음' : e.message}`);
+  }
+  refreshGpio();
+}
+
+document.getElementById('alloff').addEventListener('click', async () => {
+  try { await api('/gpio/all/off'); } catch (e) { setConn(false, '모두 끄기 실패: 파이 연결 확인'); }
+  refreshGpio();
 });
 </script>
 </body>

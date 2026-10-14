@@ -161,72 +161,85 @@ journalctl -u hotspot-priority -n 20
 - GPIO 옆 작은 글씨 = 그 핀의 **대표 보조 기능** 1개 (그냥 켜고 끌 때는 무시해도 됨)
   - 핀 하나에 기능이 여러 개라 문서마다 다르게 적혀 있을 수 있음. 예: GPIO18 = `SPI1 CE0` / `PCM CLK`(파이 5에서는 I2S) / `PWM` 모두 맞음. 웹앱은 SPI 기준으로 통일
   - `SDA`·`SCL` = I2C, `TXD`·`RXD` = 시리얼(UART), `SPI0`·`SPI1` = SPI 장치 연결, `PWM` = 밝기·속도 조절용 신호, `GPCLK0` = 클럭 출력
-- "켜진 GPIO 모두 끄기": 한 번이라도 켠 핀을 전부 OFF
+- "켜진 GPIO 모두 끄기": 이 웹앱으로 켠 핀을 전부 OFF
+- 단축어 없이 바로 켜고 꺼지며, 2초마다 파이의 실제 상태를 읽어 와 표시 (점선 테두리 = 입력·다른 기능으로 쓰는 중)
 
 ### 구조
 ```
-[웹앱 2번 탭] --GPIO17 누름--> [단축어: GPIO 제어] --http://user-root.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
-                                       └── 끝나면 webapp:// 로 웹앱 2번 탭에 자동 복귀
+[웹앱 2번 탭] --GPIO17 누름--> https://user-root.local:8443/gpio/17/on --> [파이: gpio-server.py] --> GPIO17 ON
+             <-- 2초마다 https://user-root.local:8443/gpio 로 실제 상태 읽기 --
 ```
-- 왜 단축어를 거칠까? 웹앱은 `https://`(GitHub Pages)인데 파이는 `http://`라서, 보안 규칙(혼합 콘텐츠 차단) 때문에 **웹페이지가 파이에 직접 요청할 수 없음**. 단축어는 이 제한이 없어서 대신 요청을 보냄
-- 그래서 GPIO를 누를 때도 핫스팟 버튼처럼 단축어 화면이 잠깐 보였다가 돌아옴
+- **단축어 없이** 웹앱이 파이에 직접 요청. 누르면 바로 켜지고, 2초마다 파이의 **실제 핀 상태**를 읽어 화면에 표시 (다른 프로그램이 바꾼 것도 보임)
+- 웹앱은 `https://`(GitHub Pages)라서 파이도 `https://`여야 직접 요청 가능 (보안 규칙: https 페이지는 http 주소에 요청 못 함). 그래서 파이에 **직접 만든 인증서**를 쓰고, 아이폰이 그 인증서를 믿도록 한 번 설치함
 - 아이폰과 파이가 **같은 네트워크**(아이폰 핫스팟 또는 같은 iptime Wi-Fi)에 있어야 동작
+- GPIO 탭 위 글자: 초록 "● 파이 연결됨" = 정상, 빨강 "연결 안 됨" = 아래 문제 해결 참고
+- 예전에 만든 단축어 `GPIO 제어`는 이제 안 씀 (지워도 됨)
 
-### 4. 단축어 1개 더 만들기: `GPIO 제어` (아이폰, 한 번만)
-1. 단축어 앱 → `+` → 동작 추가 → `텍스트` 검색 → **텍스트** 추가
-2. 텍스트 칸에 `http://` 입력 → 바로 뒤에 커서를 둔 채, 키보드 위 변수 막대에서 **단축어 입력** 선택
-   - 결과가 `http://` + `[단축어 입력]` 한 칸이 되면 OK (`http://` 뒤에 띄어쓰기 없이)
-3. 동작 추가 → `URL` 검색 → **URL 콘텐츠 가져오기** 추가 → URL 자리가 **텍스트**로 연결돼 있으면 OK (아니면 URL 칸을 눌러 "텍스트" 선택)
-4. 이름을 **`GPIO 제어`** 로 저장 (띄어쓰기 포함 정확히)
-   - 맨 위에 "입력 받기" 칸이 생겨도 그대로 두면 됨
-5. 웹앱 2번 탭에서 처음 누를 때 "**user-root.local**에 연결하도록 허용하겠습니까?" / "로컬 네트워크" 접근 확인이 뜨면 **허용**
-
-단축어가 하는 일: 웹앱이 넘겨준 글자(예: `user-root.local:8000/gpio/17/on`) 앞에 `http://`를 붙여 그 주소를 엶 → 파이 서버가 명령을 받음.
-
-### 5. 파이에 GPIO 서버 설치 (라즈베리 파이에서 한 번만)
-추가 설치 없이 동작 (파이썬 기본 웹 서버 + Raspberry Pi OS에 기본 포함된 `gpiozero`).
+### 4. 파이에 GPIO 서버 설치 (라즈베리 파이에서 한 번만)
+추가 설치 없이 동작 (파이썬 기본 웹 서버 + Raspberry Pi OS에 기본 포함된 `gpiozero`, `pinctrl`, `openssl`).
 ```bash
 # 1) 최신 파일 받기
 cd ~/RaspberryPi && git pull
 cd ~/RaspberryPi/iphone-app/pi
 
-# 2) 설치
+# 2) https 인증서 만들기 (처음 한 번만)
+sudo bash make-cert.sh
+# ↑ 정상: 마지막 줄에 "완료: /etc/gpio-server 에 인증서를 만들었어요 (주소: user-root.local)"
+#   (중간에 ..... +++++ 같은 줄이 나오는 건 정상)
+
+# 3) 서버 설치
 sudo cp gpio-server.py /usr/local/bin/
 sudo cp gpio-server.service /etc/systemd/system/
 
-# 3) 켜기 (지금 바로 + 부팅 때마다 자동)
+# 4) 켜기 (지금 바로 + 부팅 때마다 자동). 이미 설치했었다면 restart 로 새 버전 적용
 sudo systemctl daemon-reload
 sudo systemctl enable --now gpio-server
+sudo systemctl restart gpio-server
 
-# 4) 확인
+# 5) 확인
 systemctl is-active gpio-server
 # ↑ 정상: active   (failed 가 나오면 아래 journalctl 로 오류 확인)
 
-curl http://localhost:8000/gpio/17/on
+journalctl -u gpio-server -n 5
+# ↑ 정상: "GPIO 서버 시작: 포트 8000" 과 "https 시작: 포트 8443" 두 줄이 보임
+#   "https 꺼짐: 인증서가 없어요" 가 보이면 2) 를 다시 실행 후 restart
+
+curl -k https://localhost:8443/gpio/17/on
 # ↑ 정상: {"pin": 17, "on": true}   (GPIO17에 LED를 연결했다면 켜짐)
-curl http://localhost:8000/gpio/17/off
+#   -k = 이 테스트에서는 인증서 확인을 건너뜀 (파이 안에서 시험할 때만)
+curl -k https://localhost:8443/gpio
+# ↑ 정상: {"2": {"mode": "ip", "on": false}, ... "17": {"mode": "op", "on": true}, ...}
+#   mode: op = 출력, ip = 입력, no = 안 씀, a0~a8 = 다른 기능(I2C·SPI 등)
+curl -k https://localhost:8443/gpio/17/off
 # ↑ 정상: {"pin": 17, "on": false}
 
-journalctl -u gpio-server -n 5
-# ↑ 정상: "GPIO 서버 시작: 포트 8000", "GPIO17 → ON", "GPIO17 → OFF" 줄이 보임
-
 hostname
-# ↑ 파이 이름. 이 파이는 user-root → 웹앱 주소 user-root.local:8000 (웹앱 기본값)
-#   다른 이름(예: mypi)이 나오면 웹앱 2번 탭 아래 "파이 주소"에 mypi.local:8000 입력
-#   (user-root.local 이 아님에 주의: 이름이 다르면 아이폰이 파이를 못 찾음)
+# ↑ 파이 이름. 이 파이는 user-root → 웹앱 주소 user-root.local:8443 (웹앱 기본값)
+#   다른 이름(예: mypi)이 나오면 웹앱 2번 탭 아래 "파이 주소"에 mypi.local:8443 입력
+#   (이름이 다르면 아이폰이 파이를 못 찾음)
 ```
 
-**아이폰에서 연결 확인**: 아이폰 핫스팟에 파이가 붙은 상태에서 Safari로 `http://user-root.local:8000/gpio` 열기
-- 정상: `{}` 또는 `{"17": false}` 같은 글자가 보임
-- "서버를 찾을 수 없음": 주소의 이름이 파이 이름(`hostname` 결과)과 다름 → 이름 확인 후 웹앱 "파이 주소" 수정
-- "서버에 연결할 수 없음": 파이가 핫스팟에 안 붙었거나 서버가 꺼짐 → 위 4) 확인
-- 원인 찾기: 파이에서 `hostname -I` 맨 앞 숫자(예: `172.20.10.8`)로 `http://172.20.10.8:8000/gpio`를 열어 봄. 숫자로는 열리면 서버는 정상이고 이름 문제 (숫자 주소는 핫스팟을 다시 켜면 바뀔 수 있어서 계속 쓰지는 않음)
+### 5. 아이폰에 인증서 설치 (아이폰에서 한 번만)
+파이가 핫스팟(또는 같은 iptime Wi-Fi)에 붙어 있는 상태에서:
+1. **Safari 앱**에서 `http://user-root.local:8000/ca.crt` 열기 (웹앱 GPIO 탭 맨 아래 "처음 한 번: 아이폰에 인증서 설치하기"를 눌러도 됨)
+   → "구성 프로파일을 다운로드하려고 합니다" → **허용** → "프로파일이 다운로드됨" → 닫기
+2. 설정 → 일반 → **VPN 및 기기 관리** → `user-root GPIO CA` → **설치** → 아이폰 암호 → **설치** → 완료
+3. 설정 → 일반 → 정보 → 맨 아래 **인증서 신뢰 설정** → `user-root GPIO CA` **켜기** → 계속
+4. 확인: Safari에서 `https://user-root.local:8443/gpio` 열기
+   - 정상: 경고 없이 `{"2": {"mode": ...` 같은 글자가 보임
+   - "연결이 비공개로 설정되어 있지 않습니다" 경고: 3번(신뢰 켜기)이 빠졌거나, 파이에서 인증서를 새로 만듦 → 1~3번 다시
+   - "서버를 찾을 수 없음": 주소의 이름이 파이 이름(`hostname`)과 다름
+   - "서버에 연결할 수 없음": 파이가 핫스팟에 안 붙었거나 서버가 꺼짐 → 4번의 5) 확인
+5. 웹앱을 완전히 닫았다가 다시 열기 → GPIO 탭 위에 초록 **"● 파이 연결됨 · 실제 상태 표시 중"** 이 나오면 끝
+
+이 인증서는 승철 님 파이의 `user-root.local` 주소에만 쓰이는 것. 지우려면 설정 → 일반 → VPN 및 기기 관리 → `user-root GPIO CA` → 프로파일 제거.
 
 ### LED로 테스트하기
 GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 → GND(9번 또는 14번 핀). 웹앱 2번 탭에서 **GPIO17**을 누르면 LED가 켜짐.
 
 ### 알아 둘 점
-- 웹앱은 파이의 실제 핀 상태를 읽지 못하고 **마지막으로 누른 상태**를 기억함. 파이를 재부팅하면 핀은 모두 OFF가 되지만 웹앱은 ON으로 보일 수 있음 → "켜진 GPIO 모두 끄기" 또는 그 핀을 한 번 더 누르기
+- 화면의 ON은 파이에서 2초마다 읽어 온 **실제 상태**. 점선 테두리 = 그 핀을 입력이나 다른 기능(I2C·SPI 등)으로 쓰는 중
+- "켜진 GPIO 모두 끄기"는 **이 서버로 켠 핀**만 끔 (다른 프로그램이 켠 핀은 그 프로그램에서 끄기)
 - GPIO는 **3.3V, 약한 전류**만 출력. 모터·릴레이 등은 직접 연결하지 말고 트랜지스터/드라이버 모듈을 거칠 것
 - 같은 iptime Wi-Fi에 있는 다른 사람도 이 주소를 알면 GPIO를 켤 수 있음 (핫스팟에서는 내 폰만 접속)
 - 서버 끄기: `sudo systemctl disable --now gpio-server`
@@ -238,7 +251,7 @@ GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 �
 ```js
 const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
-const SHORTCUT_GPIO = 'GPIO 제어';   // 2번 탭: 단축어 입력으로 'user-root.local:8000/gpio/17/on' 같은 주소를 넘김
+// 2번 탭(GPIO)은 단축어 없이 fetch('https://user-root.local:8443/gpio/17/on') 로 파이에 직접 요청
 
 // 버튼을 누르면: 화면을 먼저 ON/OFF로 바꾸고 단축어 실행
 const back = encodeURIComponent('webapp://' + location.host + location.pathname);  // 홈 화면 웹앱 주소
@@ -246,7 +259,7 @@ const url = 'shortcuts://x-callback-url/run-shortcut?name=' + encodeURIComponent
   + '&x-success=' + back + '&x-cancel=' + back + '&x-error=' + back;
 location.href = url;
 ```
-- 탭 번호·버튼 상태·GPIO 상태는 단축어를 부르기 **전에** `localStorage`(브라우저 저장소)에 저장 → 웹앱으로 돌아왔을 때 같은 ON/OFF 화면 유지
+- 탭 번호·핫스팟 버튼 상태는 단축어를 부르기 **전에** `localStorage`(브라우저 저장소)에 저장 → 웹앱으로 돌아왔을 때 같은 ON/OFF 화면 유지
 - 자동 복귀는 `x-callback-url`의 `x-success`에 `webapp://도메인/경로` 사용 (iOS 26부터 홈 화면 웹앱을 여는 주소). `https://`로 돌아오게 하면 Safari **새 탭**이 생김
 - `webapp://`은 경로·파라미터를 무시하고 앱만 열어서, 상태는 단축어 실행 **전에** 저장. 일부 iOS 버전에서는 "주소가 유효하지 않음" 오류가 난다는 보고도 있음 → 그때는 **◀** 로 복귀
 - 공백은 반드시 `%20`으로 인코딩 (`URLSearchParams`는 공백을 `+`로 바꿔 단축어 이름이 안 맞음)
@@ -263,8 +276,9 @@ location.href = url;
 | 단축어 실행 후 단축어 앱에 머묾 / "주소가 유효하지 않음" | 이 iOS에서 `webapp://` 복귀가 안 되는 경우. 핫스팟은 이미 바뀌었으니 왼쪽 위 **◀** 로 돌아가기 |
 | 단축어 실행에 실패했는데 버튼은 바뀜 | 버튼을 한 번 더 눌러 맞추기 (단축어 이름 확인) |
 | 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기, `journalctl -u hotspot-priority`로 로그 확인 |
-| "'GPIO 제어' 단축어를 찾을 수 없습니다" | 4번대로 `GPIO 제어` 단축어 만들기 (띄어쓰기 포함) |
-| GPIO를 눌러도 LED가 안 켜짐 | 아이폰 Safari에서 `http://user-root.local:8000/gpio`가 열리는지 확인 (5번 '아이폰에서 연결 확인'), 배선·LED 방향 확인 |
+| GPIO 탭에 빨강 "파이에 연결 안 됨" | Safari에서 `https://user-root.local:8443/gpio`가 경고 없이 열리는지 확인 (5번의 4) → 경고가 나오면 인증서 신뢰 켜기, 안 열리면 핫스팟 연결·`systemctl is-active gpio-server` 확인 |
+| 화면은 ON인데 LED가 안 켜짐 | 배선·LED 방향(긴 다리가 GPIO 쪽)·저항 확인 |
+| "GPIO17 실패: ... 쓸 수 없어요" | 다른 프로그램이 그 핀을 쓰는 중 → 그 프로그램을 끄거나 다른 GPIO 사용 |
 | 파이가 핫스팟으로 안 넘어감 | 서비스 파일의 핫스팟 이름이 `nmcli connection show`의 이름과 정확히 같은지 확인 |
 
 <br><br><br>

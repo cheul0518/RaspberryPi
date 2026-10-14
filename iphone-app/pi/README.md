@@ -1,16 +1,17 @@
 # pi 폴더 파일 설명 (한 줄씩)
 
-라즈베리 파이에 설치하는 파일 5개.
+라즈베리 파이에 설치하는 파일 6개.
 - 핫스팟 자동 접속 (파트 1): `hotspot-priority.sh`, `.service`, `.timer` → 설치: [../README.md 3번](../README.md#3-파이가-핫스팟에-자동-접속하게-라즈베리-파이에서-한-번만)
-- GPIO 제어 서버 (파트 2): `gpio-server.py`, `gpio-server.service` → 설치: [../README.md 5번](../README.md#5-파이에-gpio-서버-설치-라즈베리-파이에서-한-번만), 설명: 아래 4·5번
+- GPIO 제어 서버 (파트 2): `gpio-server.py`, `gpio-server.service`, `make-cert.sh` → 설치: [../README.md 4번](../README.md#4-파이에-gpio-서버-설치-라즈베리-파이에서-한-번만), 설명: 아래 4·5·6번
 
 | 파일 | 역할 | 설치 위치 |
 |-----|-----|-----|
 | `hotspot-priority.sh` | **실제 일을 하는 스크립트**: 핫스팟이 보이면 전환 | `/usr/local/bin/` |
 | `hotspot-priority.service` | **무엇을** 실행할지 systemd에 알려 주는 설정 | `/etc/systemd/system/` |
 | `hotspot-priority.timer` | **언제** 실행할지 (부팅 20초 후부터 30초마다) | `/etc/systemd/system/` |
-| `gpio-server.py` | 아이폰 단축어의 요청을 받아 **GPIO를 켜고 끄는 작은 웹 서버** | `/usr/local/bin/` |
+| `gpio-server.py` | 웹앱의 요청을 받아 **GPIO를 켜고 끄고, 실제 상태를 알려 주는 작은 웹 서버** | `/usr/local/bin/` |
 | `gpio-server.service` | GPIO 서버를 **부팅 때 켜고 계속 켜 두는** systemd 설정 | `/etc/systemd/system/` |
+| `make-cert.sh` | 웹앱이 `https`로 접속할 수 있게 **인증서를 만드는** 스크립트 (처음 한 번 실행) | 복사 안 함, 결과는 `/etc/gpio-server/` |
 
 동작 순서: 부팅 → **timer**가 30초마다 → **service**를 실행 → service가 **sh 스크립트**를 실행 → 핫스팟이 보이면 전환
 
@@ -99,19 +100,25 @@ WantedBy=timers.target               # enable 하면 부팅 때마다 이 타이
 
 ```python
 #!/usr/bin/env python3               # 셔뱅: 이 파일을 python3로 실행하라는 표시
-# 라즈베리 파이 GPIO 제어 서버 ...    # 주석(원본 2~6줄): 무슨 프로그램인지, 어떤 주소로 부르는지
+# 라즈베리 파이 GPIO 제어 서버 ...    # 주석(원본 2~7줄): 무슨 프로그램인지, 어떤 주소로 부르는지
 
 import json                          # 결과를 {"pin": 17, "on": true} 같은 JSON 글자로 만드는 도구
 import re                            # 정규식(글자 패턴 찾기) 도구. 주소에서 핀 번호·명령을 뽑을 때 사용
+import ssl                           # https(암호화 연결) 도구
+import subprocess                    # 다른 명령(pinctrl)을 실행하고 결과를 받는 도구
+import threading                     # 두 서버(http·https)를 동시에 돌리는 도구
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
                                      # ↑ 파이썬 기본 웹 서버 도구 (추가 설치 불필요)
                                      #   ThreadingHTTPServer = 여러 요청을 동시에 처리
 
 from gpiozero import OutputDevice    # GPIO 핀을 출력용(켜기/끄기)으로 쓰는 도구. Raspberry Pi OS 기본 포함, 파이 5 지원
 
-PORT = 8000                          # 서버가 받을 포트 번호 = 주소 뒤의 :8000
+HTTP_PORT = 8000                     # http 포트: 인증서 받기(/ca.crt)·테스트용
+HTTPS_PORT = 8443                    # https 포트: 웹앱이 쓰는 주소 = user-root.local:8443
+CERT_DIR = '/etc/gpio-server'        # make-cert.sh 가 인증서를 만드는 폴더
 ALLOWED = set(range(2, 28))          # 제어 허용 GPIO 2~27 (range(2, 28) = 2부터 27까지). GPIO0·1은 HAT 정보용이라 제외
-pins = {}                            # 한 번이라도 쓴 핀을 기억하는 사전 {번호: 핀}
+pins = {}                            # 이 서버가 켜고 끈 핀을 기억하는 사전 {번호: 핀}
+lock = threading.Lock()              # 두 요청이 동시에 같은 핀을 건드리지 않게 하는 자물쇠
 
 
 def device(pin):                     # 핀 번호를 주면 그 핀을 돌려주는 함수
@@ -120,53 +127,98 @@ def device(pin):                     # 핀 번호를 주면 그 핀을 돌려주
     return pins[pin]                 # 저장된 핀을 돌려줌
 
 
+def read_all():                      # GPIO2~27 의 실제 상태를 읽는 함수
+    state = {}
+    try:
+        out = subprocess.run(['pinctrl', 'get', '2-27'], capture_output=True, text=True, timeout=3).stdout
+                                     # ↑ 파이 5 기본 명령 pinctrl 로 핀 상태를 읽음 (다른 프로그램이 바꾼 것도 보임)
+                                     #   한 줄 예: " 17: op dh pd | hi // GPIO17 = output"
+        for line in out.splitlines():    # 한 줄씩
+            m = re.match(r'\s*(\d+):\s+(\S+).*\|\s*(hi|lo)', line)
+                                     # ↑ 줄에서 핀 번호(17), 모드(op), 전압(hi/lo)을 뽑음
+            if m and int(m.group(1)) in ALLOWED:
+                mode = m.group(2)    # op = 출력, ip = 입력, no = 안 씀, a0~a8 = 다른 기능(I2C·SPI 등)
+                state[m.group(1)] = {'mode': mode, 'on': mode == 'op' and m.group(3) == 'hi'}
+                                     # ↑ "켜짐" = 출력(op)이면서 전압이 높음(hi)
+    except (OSError, subprocess.SubprocessError):
+        pass                         # pinctrl 실행이 실패하면 그냥 넘어감
+    if not state:                    # pinctrl 결과가 없으면 이 서버가 기억하는 핀만 알려 줌
+        state = {str(p): {'mode': 'op', 'on': bool(d.value)} for p, d in pins.items()}
+    return state
+
+
 class Handler(BaseHTTPRequestHandler):   # 요청이 올 때마다 무엇을 할지 정하는 부분
-    def do_GET(self):                # 주소를 여는 요청(GET)이 오면 실행. 단축어의 "URL 콘텐츠 가져오기"가 GET
+    def do_GET(self):                # 주소를 여는 요청(GET)이 오면 실행
         path = self.path.split('?')[0].rstrip('/')    # 주소에서 ? 뒤와 끝의 / 를 지움 → 예: /gpio/17/on
+        if path == '/ca.crt':        # 아이폰이 인증서를 받으러 오면
+            try:
+                body = open(f'{CERT_DIR}/ca.crt', 'rb').read()   # 인증서 파일을 읽음
+            except OSError:          # 파일이 없으면 (make-cert.sh 안 함)
+                return self.reply(404, {'error': '인증서가 없어요. make-cert.sh 를 먼저 실행하세요'})
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/x-x509-ca-cert')   # "인증서 파일"이라고 알림 → 아이폰이 설치 화면을 띄움
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         m = re.fullmatch(r'/gpio/(\d+)/(on|off|toggle)', path)
                                      # ↑ 주소가 /gpio/숫자/on·off·toggle 모양인지 검사
-                                     #   (\d+) = 숫자 부분, (on|off|toggle) = 명령 부분
         if m:                        # 모양이 맞으면
             pin, action = int(m.group(1)), m.group(2)   # 숫자 → 핀 번호, 명령 → action (예: 17, 'on')
-            if pin not in ALLOWED:   # 2~27이 아니면
+            if pin not in ALLOWED:   # 2~27이 아니면 400(잘못된 요청)
                 return self.reply(400, {'error': f'GPIO{pin}는 사용할 수 없어요 (2~27만 가능)'})
-                                     # ↑ 400(잘못된 요청)과 오류 메시지를 돌려주고 끝
-            dev = device(pin)        # 그 핀 가져오기
-            if action == 'on':
-                dev.on()             # 켜기 (핀에서 3.3V 출력)
-            elif action == 'off':
-                dev.off()            # 끄기 (0V)
-            else:
-                dev.toggle()         # 지금과 반대로
-            print(f'GPIO{pin} → {"ON" if dev.value else "OFF"}', flush=True)
-                                     # ↑ 로그에 "GPIO17 → ON" 출력 (journalctl -u gpio-server 로 봄). flush=True = 바로 기록
-            return self.reply(200, {'pin': pin, 'on': bool(dev.value)})   # 200(성공)과 {"pin": 17, "on": true}
+            with lock:               # 자물쇠를 잠그고
+                try:
+                    dev = device(pin)    # 그 핀 가져오기
+                except Exception as e:   # 다른 프로그램이 이미 쓰는 핀이면 409(충돌)
+                    return self.reply(409, {'error': f'GPIO{pin}을 쓸 수 없어요: {e}'})
+                getattr(dev, action)()   # dev.on() 켜기 / dev.off() 끄기 / dev.toggle() 반대로
+                on = bool(dev.value)     # 지금 켜져 있는지
+            print(f'GPIO{pin} → {"ON" if on else "OFF"}', flush=True)
+                                     # ↑ 로그에 "GPIO17 → ON" 출력 (journalctl -u gpio-server 로 봄)
+            return self.reply(200, {'pin': pin, 'on': on})   # 200(성공)과 {"pin": 17, "on": true}
         if path == '/gpio/all/off':  # 웹앱의 "켜진 GPIO 모두 끄기"
-            for dev in pins.values():
-                dev.off()            # 한 번이라도 쓴 핀을 전부 끔
+            with lock:
+                for dev in pins.values():
+                    dev.off()        # 이 서버로 켠 핀을 전부 끔
             print('모든 GPIO → OFF', flush=True)
             return self.reply(200, {'all': 'off'})
-        if path == '/gpio':          # 지금까지 쓴 핀 상태 보기 (예: {"17": true})
-            return self.reply(200, {str(p): bool(d.value) for p, d in sorted(pins.items())})
+        if path == '/gpio':          # 실제 상태 보기 (웹앱이 2초마다 부름)
+            return self.reply(200, read_all())
         self.reply(404, {'error': 'not found'})   # 그 외 주소는 404(없음)
 
     def reply(self, code, data):     # 결과를 보내는 공통 함수
         body = json.dumps(data, ensure_ascii=False).encode()   # JSON 글자로 바꿈 (ensure_ascii=False = 한글 그대로)
-        self.send_response(code)     # 상태 코드 (200 성공 / 400 잘못된 요청 / 404 없음)
+        self.send_response(code)     # 상태 코드 (200 성공 / 400 잘못된 요청 / 404 없음 / 409 충돌)
         self.send_header('Content-Type', 'application/json; charset=utf-8')   # "내용은 JSON"이라고 알림
         self.send_header('Content-Length', str(len(body)))   # 내용 길이
+        self.send_header('Access-Control-Allow-Origin', '*')
+                                     # ↑ 다른 주소(GitHub 웹앱)에서 온 요청도 결과를 읽을 수 있게 허용. 없으면 웹앱이 답을 못 읽음
+        self.send_header('Cache-Control', 'no-store')   # 저장해 둔 옛날 답 말고 항상 새로 받게 함
         self.end_headers()           # 머리말 끝
         self.wfile.write(body)       # 내용 보내기
 
     def log_message(self, *args):    # 접속할 때마다 찍히는 기본 기록은 끔
-        pass                         # (로그에는 GPIO 변경만 남김)
+        pass                         # (2초마다 상태 읽기가 로그를 채우지 않게. GPIO 변경만 남김)
+
+
+def serve_https():                   # https 서버 (웹앱용)
+    try:
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)   # https 설정 만들기
+        ctx.load_cert_chain(f'{CERT_DIR}/server.crt', f'{CERT_DIR}/server.key')   # make-cert.sh 가 만든 인증서·키
+    except OSError:                  # 인증서가 없으면 https 는 켜지 않음 (http 8000 은 계속 동작)
+        print('https 꺼짐: 인증서가 없어요. make-cert.sh 를 먼저 실행하세요', flush=True)
+        return
+    httpd = ThreadingHTTPServer(('0.0.0.0', HTTPS_PORT), Handler)   # 8443번 포트로 같은 Handler 사용
+    httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)   # 연결을 https 로 감쌈
+    print(f'https 시작: 포트 {HTTPS_PORT}', flush=True)
+    httpd.serve_forever()            # 끌 때까지 계속 요청을 기다림
 
 
 if __name__ == '__main__':           # 이 파일을 직접 실행했을 때만 아래 실행 (파이썬 관례)
-    print(f'GPIO 서버 시작: 포트 {PORT}', flush=True)   # 시작 메시지
-    ThreadingHTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
-                                     # ↑ 0.0.0.0 = 파이의 모든 네트워크(핫스팟·iptime)에서 8000번 포트로 받음
-                                     #   serve_forever() = 끌 때까지 계속 요청을 기다림
+    threading.Thread(target=serve_https, daemon=True).start()   # https 서버를 옆에서 따로 실행
+    print(f'GPIO 서버 시작: 포트 {HTTP_PORT}', flush=True)
+    ThreadingHTTPServer(('0.0.0.0', HTTP_PORT), Handler).serve_forever()
+                                     # ↑ http 서버. 0.0.0.0 = 파이의 모든 네트워크(핫스팟·iptime)에서 받음
 ```
 
 <br><br><br>
@@ -191,6 +243,46 @@ WantedBy=multi-user.target           # enable 하면 부팅 때마다 자동 시
 
                                      # 핫스팟용 .service(한 번 실행하고 끝 + timer)와 달리
                                      # 이 서버는 계속 켜져서 요청을 기다려야 하므로 Restart=always로 항상 켜 둠
+```
+
+<br><br><br>
+
+## 6. `make-cert.sh` (https 인증서 만들기)
+
+```bash
+#!/bin/bash                          # 셔뱅: bash로 실행
+# GPIO 서버용 https 인증서 만들기 ... # 주석(원본 2~6줄)
+
+set -e                               # 중간에 오류가 나면 바로 멈춤
+NAME=$(hostname)                     # 파이 이름을 NAME에 저장 (이 파이는 user-root)
+DIR=/etc/gpio-server                 # 인증서를 둘 폴더
+mkdir -p "$DIR"                      # 폴더 만들기 (-p = 이미 있으면 그냥 넘어감)
+cd "$DIR"                            # 그 폴더로 이동
+
+if [ ! -f ca.key ]; then             # ca.key 파일이 없을 때만 (= 처음 실행할 때만)
+    openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+        -keyout ca.key -out ca.crt -subj "/CN=$NAME GPIO CA" \
+        -addext "basicConstraints=critical,CA:TRUE" \
+        -addext "keyUsage=critical,keyCertSign,cRLSign"
+                                     # ↑ 직접 만든 "인증 기관"(ca.crt + 비밀 키 ca.key). 10년(3650일) 유효
+                                     #   이름 = "user-root GPIO CA" (아이폰 설정에 이 이름으로 보임)
+                                     #   CA:TRUE = 다른 인증서에 서명할 수 있는 인증서라는 뜻
+                                     #   다시 만들면 아이폰에 다시 설치해야 해서 한 번만 만듦
+fi
+
+openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr -subj "/CN=$NAME.local"
+                                     # ↑ 서버용 비밀 키(server.key)와 서명 요청서(server.csr) 만들기
+printf "subjectAltName=DNS:%s.local\nbasicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\n" "$NAME" > server.ext
+                                     # ↑ 서버 인증서에 넣을 정보: 주소 user-root.local, 서버용(serverAuth)
+                                     #   아이폰은 이 정보가 없으면 인증서를 받아 주지 않음
+openssl x509 -req -in server.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -days 825 -out server.crt -extfile server.ext
+                                     # ↑ 인증 기관(ca)이 서버 인증서(server.crt)에 서명. 825일 = 아이폰이 허용하는 최대 기간
+                                     #   825일(약 2년 3개월)이 지나면 이 스크립트를 다시 실행 → restart (아이폰은 다시 설치 안 해도 됨)
+rm -f server.csr server.ext          # 다 쓴 임시 파일 지우기
+chmod 600 ca.key server.key          # 비밀 키는 관리자만 읽을 수 있게
+
+echo "완료: $DIR 에 인증서를 만들었어요 (주소: $NAME.local)"   # 끝 메시지
 ```
 
 <br><br><br>
