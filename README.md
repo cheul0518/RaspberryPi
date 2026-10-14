@@ -1,25 +1,9 @@
-Welcome! Please choose your language:
-  - ko [한국어로 보기](./ko/README.md)
-  - en [View in English](./en/README.md)
+# Raspberry Pi 5
 
+라즈베리 파이 5 학습·활용 기록.
 
-
-
-1. Linux commands
-2. GPIO layout
-3. Board v. Broadcom
-4. Virtual environment
-5. simple circuit (raspberry pi 3.3v - led - resistor - raspberry pi gnd)
-6. GPIO v. gpiozero
-7. other libraries
-8. circut: raspberry pi gpio - led - resistor - gnd
-9. input mod
-10. floating
-11. pull up / pull down
-12. circut: raspberry pi gpio - led - resistor - gnd + switch
-13. PWM?
-14. example + circut: gpio - led A - resistor  + led B (duty cycle 50%) - resistor - -> gnd 
-15. pigpio? raspberry 5 is not compatible with (for raspberry pi 4 is recommended)
-16. git -> upload 
-17. iPhone - hotspot (part 1) → [iphone-app](./iphone-app/README.md)
-18. iPhone - GPIO control tab (part 2) → [iphone-app](./iphone-app/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃)
+| 폴더 | 내용 |
+|-----|-----|
+| [basics](./basics/README.md) | 기초 개념: 라즈베리 파이 소개, 아두이노 비교, 보드 구조, OS 설치·기본 설정 |
+| [iphone-app](./iphone-app/README.md) | 아이폰 웹앱: 핫스팟 켜기/끄기(파트 1), GPIO 제어·실시간 상태(파트 2) → [웹앱 열기](https://cheul0518.github.io/RaspberryPi/iphone-app/) |
+| images | 문서에 쓰는 그림 |
