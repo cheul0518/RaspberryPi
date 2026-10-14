@@ -1,11 +1,12 @@
-# 아이폰 연동 - 핫스팟 (파트 1)
+# 아이폰 앱 (iphone-app)
 
 아이폰에서 앱처럼 실행되는 **탭 3개짜리 웹앱**.
 - **1번 탭 (핫스팟)**: 버튼 1개로 아이폰 **개인용 핫스팟 켜고 끄기** (파트 1)
 - **2번 탭 (GPIO)**: 라즈베리 파이 5 **핀아웃**을 보고, 누른 **GPIO를 ON/OFF** (파트 2 → [아래 설명](#파트-2-gpio-탭-라즈베리-파이-5-핀아웃))
 - **3번 탭**: 비워 둠 (다음 기능용)
 
-- 웹앱 주소: https://cheul0518.github.io/RaspberryPi/hotspot/
+- 웹앱 주소: https://cheul0518.github.io/RaspberryPi/iphone-app/
+  - 2026-10-14에 폴더 이름을 `hotspot` → `iphone-app`으로 바꿈. 예전 주소(`.../hotspot/`)는 새 주소로 자동으로 넘어가지만, 홈 화면 아이콘은 아래 2번 순서로 **새 주소로 다시 추가**하는 것을 권장
 - 1번 탭 동작: 버튼을 누르면 눌린 채로 **ON** + 핫스팟 켜짐, 다시 누르면 원위치 **OFF** + 핫스팟 꺼짐
 - 확인 환경: iPhone 17 (iOS 26), 홈 화면 웹앱 → 단축어 실행 → 웹앱으로 자동 복귀 동작 확인 (2026-10-13, 1번 탭)
 
@@ -43,7 +44,7 @@
 - 단축어는 파일로 자동 설치 불가: iOS는 Apple 서명된 단축어 파일만 가져올 수 있고, 서명은 Mac에서만 가능
 
 ### 2. 홈 화면에 추가 (앱처럼 독립 창으로)
-1. Safari에서 https://cheul0518.github.io/RaspberryPi/hotspot/ 열기
+1. Safari에서 https://cheul0518.github.io/RaspberryPi/iphone-app/ 열기
 2. 공유 버튼 → **홈 화면에 추가** → **"웹 앱으로 열기" 켜기** → 이름 `핫스팟` → 추가
 3. 이후엔 홈 화면 아이콘으로만 실행 (주소창 없는 독립 창, 실행할 때마다 Safari 탭이 생기지 않음)
 4. 처음 누를 때 "단축어에서 열겠습니까?" 확인이 뜨면 열기
@@ -85,7 +86,7 @@ cd ~
 git clone https://github.com/cheul0518/RaspberryPi.git   # 처음 한 번만
 # 이미 받은 적 있으면 clone 대신 최신 내용만 받기:
 #   cd ~/RaspberryPi && git pull
-cd ~/RaspberryPi/hotspot/pi
+cd ~/RaspberryPi/iphone-app/pi
 
 # 2) 설치
 sudo cp hotspot-priority.sh /usr/local/bin/
@@ -185,7 +186,7 @@ journalctl -u hotspot-priority -n 20
 ```bash
 # 1) 최신 파일 받기
 cd ~/RaspberryPi && git pull
-cd ~/RaspberryPi/hotspot/pi
+cd ~/RaspberryPi/iphone-app/pi
 
 # 2) 설치
 sudo cp gpio-server.py /usr/local/bin/

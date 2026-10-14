@@ -21,5 +21,5 @@ Welcome! Please choose your language:
 14. example + circut: gpio - led A - resistor  + led B (duty cycle 50%) - resistor - -> gnd 
 15. pigpio? raspberry 5 is not compatible with (for raspberry pi 4 is recommended)
 16. git -> upload 
-17. iPhone - hotspot (part 1) → [hotspot](./hotspot/README.md)
-18. iPhone - GPIO control tab (part 2) → [hotspot](./hotspot/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃)
+17. iPhone - hotspot (part 1) → [iphone-app](./iphone-app/README.md)
+18. iPhone - GPIO control tab (part 2) → [iphone-app](./iphone-app/README.md#파트-2-gpio-탭-라즈베리-파이-5-핀아웃)
