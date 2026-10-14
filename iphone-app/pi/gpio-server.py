@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # 라즈베리 파이 GPIO 제어 서버 (웹앱 2번 탭 → 아이폰 단축어 "GPIO 제어" → 이 서버)
 # 추가 설치 없이 동작: 파이썬 기본 웹 서버 + Raspberry Pi OS에 기본으로 있는 gpiozero
-# 주소 예: http://raspberrypi.local:8000/gpio/17/on   (on / off / toggle)
-#          http://raspberrypi.local:8000/gpio/all/off  (쓴 핀 모두 끄기)
-#          http://raspberrypi.local:8000/gpio          (지금 켜진 핀 목록)
+# 주소 예: http://user-root.local:8000/gpio/17/on   (on / off / toggle)
+#          http://user-root.local:8000/gpio/all/off  (쓴 핀 모두 끄기)
+#          http://user-root.local:8000/gpio          (지금 켜진 핀 목록)
 
 import json
 import re

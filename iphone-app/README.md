@@ -165,7 +165,7 @@ journalctl -u hotspot-priority -n 20
 
 ### 구조
 ```
-[웹앱 2번 탭] --GPIO17 누름--> [단축어: GPIO 제어] --http://raspberrypi.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
+[웹앱 2번 탭] --GPIO17 누름--> [단축어: GPIO 제어] --http://user-root.local:8000/gpio/17/on--> [파이: gpio-server.py] --> GPIO17 ON
                                        └── 끝나면 webapp:// 로 웹앱 2번 탭에 자동 복귀
 ```
 - 왜 단축어를 거칠까? 웹앱은 `https://`(GitHub Pages)인데 파이는 `http://`라서, 보안 규칙(혼합 콘텐츠 차단) 때문에 **웹페이지가 파이에 직접 요청할 수 없음**. 단축어는 이 제한이 없어서 대신 요청을 보냄
@@ -179,9 +179,9 @@ journalctl -u hotspot-priority -n 20
 3. 동작 추가 → `URL` 검색 → **URL 콘텐츠 가져오기** 추가 → URL 자리가 **텍스트**로 연결돼 있으면 OK (아니면 URL 칸을 눌러 "텍스트" 선택)
 4. 이름을 **`GPIO 제어`** 로 저장 (띄어쓰기 포함 정확히)
    - 맨 위에 "입력 받기" 칸이 생겨도 그대로 두면 됨
-5. 웹앱 2번 탭에서 처음 누를 때 "**raspberrypi.local**에 연결하도록 허용하겠습니까?" / "로컬 네트워크" 접근 확인이 뜨면 **허용**
+5. 웹앱 2번 탭에서 처음 누를 때 "**user-root.local**에 연결하도록 허용하겠습니까?" / "로컬 네트워크" 접근 확인이 뜨면 **허용**
 
-단축어가 하는 일: 웹앱이 넘겨준 글자(예: `raspberrypi.local:8000/gpio/17/on`) 앞에 `http://`를 붙여 그 주소를 엶 → 파이 서버가 명령을 받음.
+단축어가 하는 일: 웹앱이 넘겨준 글자(예: `user-root.local:8000/gpio/17/on`) 앞에 `http://`를 붙여 그 주소를 엶 → 파이 서버가 명령을 받음.
 
 ### 5. 파이에 GPIO 서버 설치 (라즈베리 파이에서 한 번만)
 추가 설치 없이 동작 (파이썬 기본 웹 서버 + Raspberry Pi OS에 기본 포함된 `gpiozero`).
@@ -211,13 +211,16 @@ journalctl -u gpio-server -n 5
 # ↑ 정상: "GPIO 서버 시작: 포트 8000", "GPIO17 → ON", "GPIO17 → OFF" 줄이 보임
 
 hostname
-# ↑ raspberrypi 가 나오면 웹앱의 파이 주소를 그대로(raspberrypi.local:8000) 두면 됨
+# ↑ 파이 이름. 이 파이는 user-root → 웹앱 주소 user-root.local:8000 (웹앱 기본값)
 #   다른 이름(예: mypi)이 나오면 웹앱 2번 탭 아래 "파이 주소"에 mypi.local:8000 입력
+#   (user-root.local 이 아님에 주의: 이름이 다르면 아이폰이 파이를 못 찾음)
 ```
 
-**아이폰에서 연결 확인**: 아이폰 핫스팟에 파이가 붙은 상태에서 Safari로 `http://raspberrypi.local:8000/gpio` 열기
+**아이폰에서 연결 확인**: 아이폰 핫스팟에 파이가 붙은 상태에서 Safari로 `http://user-root.local:8000/gpio` 열기
 - 정상: `{}` 또는 `{"17": false}` 같은 글자가 보임
-- "서버에 연결할 수 없음": 파이가 핫스팟에 안 붙었거나 서버가 꺼짐 → 위 4) 확인. 그래도 안 되면 파이에서 `hostname -I`로 나온 IP(예: `172.20.10.2`)를 써서 `172.20.10.2:8000`을 웹앱 "파이 주소"에 입력
+- "서버를 찾을 수 없음": 주소의 이름이 파이 이름(`hostname` 결과)과 다름 → 이름 확인 후 웹앱 "파이 주소" 수정
+- "서버에 연결할 수 없음": 파이가 핫스팟에 안 붙었거나 서버가 꺼짐 → 위 4) 확인
+- 원인 찾기: 파이에서 `hostname -I` 맨 앞 숫자(예: `172.20.10.8`)로 `http://172.20.10.8:8000/gpio`를 열어 봄. 숫자로는 열리면 서버는 정상이고 이름 문제 (숫자 주소는 핫스팟을 다시 켜면 바뀔 수 있어서 계속 쓰지는 않음)
 
 ### LED로 테스트하기
 GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 → GND(9번 또는 14번 핀). 웹앱 2번 탭에서 **GPIO17**을 누르면 LED가 켜짐.
@@ -235,7 +238,7 @@ GPIO17(11번 핀) → 저항(220~330Ω) → LED 긴 다리, LED 짧은 다리 �
 ```js
 const SHORTCUT_ON = '핫스팟 켜기';
 const SHORTCUT_OFF = '핫스팟 끄기';
-const SHORTCUT_GPIO = 'GPIO 제어';   // 2번 탭: 단축어 입력으로 'raspberrypi.local:8000/gpio/17/on' 같은 주소를 넘김
+const SHORTCUT_GPIO = 'GPIO 제어';   // 2번 탭: 단축어 입력으로 'user-root.local:8000/gpio/17/on' 같은 주소를 넘김
 
 // 버튼을 누르면: 화면을 먼저 ON/OFF로 바꾸고 단축어 실행
 const back = encodeURIComponent('webapp://' + location.host + location.pathname);  // 홈 화면 웹앱 주소
@@ -261,7 +264,7 @@ location.href = url;
 | 단축어 실행에 실패했는데 버튼은 바뀜 | 버튼을 한 번 더 눌러 맞추기 (단축어 이름 확인) |
 | 파이가 핫스팟에 안 붙음 | "호환성 최대화" 켜기, 핫스팟 설정 화면을 열어 둔 채 기다리기, `journalctl -u hotspot-priority`로 로그 확인 |
 | "'GPIO 제어' 단축어를 찾을 수 없습니다" | 4번대로 `GPIO 제어` 단축어 만들기 (띄어쓰기 포함) |
-| GPIO를 눌러도 LED가 안 켜짐 | 아이폰 Safari에서 `http://raspberrypi.local:8000/gpio`가 열리는지 확인 (5번 '아이폰에서 연결 확인'), 배선·LED 방향 확인 |
+| GPIO를 눌러도 LED가 안 켜짐 | 아이폰 Safari에서 `http://user-root.local:8000/gpio`가 열리는지 확인 (5번 '아이폰에서 연결 확인'), 배선·LED 방향 확인 |
 | 파이가 핫스팟으로 안 넘어감 | 서비스 파일의 핫스팟 이름이 `nmcli connection show`의 이름과 정확히 같은지 확인 |
 
 <br><br><br>

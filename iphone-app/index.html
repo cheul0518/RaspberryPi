@@ -191,8 +191,8 @@ const PINS = [   // 보조 기능은 대표 1개만 표시 (핀 하나에 기능
 ];
 
 const hostInput = document.getElementById('hostInput');
-hostInput.value = load('piHost', 'raspberrypi.local:8000');
-hostInput.addEventListener('change', () => save('piHost', hostInput.value.trim() || 'raspberrypi.local:8000'));
+hostInput.value = load('piHost', 'user-root.local:8000');
+hostInput.addEventListener('change', () => save('piHost', hostInput.value.trim() || 'user-root.local:8000'));
 
 let gpioOn = load('gpioOn', {});   // { "17": true, ... }  마지막으로 누른 상태 기억
 const header = document.getElementById('header');
@@ -228,12 +228,12 @@ function toggleGpio(gpio) {
   const next = !gpioOn[gpio];
   gpioOn[gpio] = next; save('gpioOn', gpioOn); renderGpio();
   // 단축어 "GPIO 제어"가 http:// + 이 텍스트 주소를 열어 파이 서버에 명령을 보냄
-  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'raspberrypi.local:8000')}/gpio/${gpio}/${next ? 'on' : 'off'}`);
+  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'user-root.local:8000')}/gpio/${gpio}/${next ? 'on' : 'off'}`);
 }
 
 document.getElementById('alloff').addEventListener('click', () => {
   gpioOn = {}; save('gpioOn', gpioOn); renderGpio();
-  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'raspberrypi.local:8000')}/gpio/all/off`);
+  runShortcut(SHORTCUT_GPIO, `${load('piHost', 'user-root.local:8000')}/gpio/all/off`);
 });
 </script>
 </body>
